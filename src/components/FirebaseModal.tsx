@@ -219,7 +219,7 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
                 <p className="text-[11px] leading-relaxed opacity-90">
                   {roomCode
                     ? `這台設備已成功綁定【${roomCode}】教室！以後每次打開網頁或 F5 重新整理，都會自動連線並載入最新進度。手機巡堂點選座號，大螢幕毫秒自動跳動！`
-                    : '只要在大螢幕與手機輸入相同的代碼（例如 706），大螢幕就會永久記住名單，兩邊雙向同步免帳號密碼！'}
+                    : '只要在大螢幕與手機輸入相同的代碼（例如 701），大螢幕就會永久記住名單，兩邊雙向同步免帳號密碼！'}
                 </p>
 
                 {lastSyncTime && (
