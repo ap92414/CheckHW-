@@ -263,9 +263,12 @@ export function subscribeToRoom(
     (snapshot) => {
       if (snapshot.exists()) {
         const val = snapshot.data();
-        if (val?.data && val?.updatedAt && val.updatedAt > lastKnownTimestamp) {
-          lastKnownTimestamp = val.updatedAt;
-          onDataUpdate(val.data as AppData);
+        if (val?.data) {
+          const newTime = Number(val.updatedAt) || 0;
+          if (newTime >= lastKnownTimestamp) {
+            lastKnownTimestamp = newTime;
+            onDataUpdate(val.data as AppData);
+          }
         }
       }
     },

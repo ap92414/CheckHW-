@@ -111,6 +111,20 @@ export default function App() {
             saveAppData(merged);
             return merged;
           });
+
+          // Automatically sync activeClassId and activeAssignmentId to the new room's class
+          if (partial.classes && partial.classes.length > 0) {
+            setActiveClassId((current) => {
+              const exists = partial.classes!.some((c) => c.id === current);
+              return exists ? current : partial.classes![0].id;
+            });
+          }
+          if (partial.assignments && partial.assignments.length > 0) {
+            setActiveAssignmentId((current) => {
+              const exists = partial.assignments!.some((a) => a.id === current);
+              return exists ? current : partial.assignments![0].id;
+            });
+          }
         },
         (err) => {
           console.warn('Room code sync notice:', err.message);
