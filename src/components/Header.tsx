@@ -22,6 +22,7 @@ interface HeaderProps {
   canUndo: boolean;
   onUndo: () => void;
   isCloudSyncActive?: boolean;
+  roomCode?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -35,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   canUndo,
   onUndo,
   isCloudSyncActive = false,
+  roomCode = '',
 }) => {
   const activeClass = classes.find((c) => c.id === activeClassId);
 
@@ -116,22 +118,24 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">研發日誌</span>
           </button>
 
-          {/* Firebase / Cloud Sync Status Badge */}
+          {/* Firebase / Classroom Room Code Status Badge */}
           <button
             onClick={onOpenFirebase}
-            title={isCloudSyncActive ? '雲端即時雙向同步中（點擊查看）' : '純本機模式（點擊開啟雲端同步）'}
+            title={roomCode ? `已連線教室【${roomCode}】（點擊管理）` : '點擊設定教室配對碼（手機⇋大螢幕即時同步）'}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
-              isCloudSyncActive 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+              roomCode 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full ${isCloudSyncActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-            <span className="hidden md:inline">{isCloudSyncActive ? '雲端同步' : '本機儲存'}</span>
+            <span className={`w-2 h-2 rounded-full ${roomCode ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+            <span className="hidden xs:inline">
+              {roomCode ? `教室 ${roomCode}` : '教室配對'}
+            </span>
             <span className={`text-[10px] px-1 rounded-sm border ${
-              isCloudSyncActive ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'
+              roomCode ? 'bg-white text-emerald-700 border-emerald-200 font-bold' : 'bg-white text-slate-500 border-slate-200'
             }`}>
-              {isCloudSyncActive ? '即時' : '離線安全'}
+              {roomCode ? '即時同步' : '未連線'}
             </span>
           </button>
         </div>

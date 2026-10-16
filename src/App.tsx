@@ -31,11 +31,18 @@ import {
   auth, 
   ensureTeacherAuth, 
   updateCloudStatus, 
-  subscribeToTeacherData 
+  subscribeToTeacherData,
+  uploadAppDataToCloud,
+  getStoredRoomCode,
+  setStoredRoomCode,
+  subscribeToRoom,
+  updateRoomStatus,
+  uploadRoomData
 } from './utils/firebase';
 
 export default function App() {
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
+  const [roomCode, setRoomCode] = useState<string>(() => getStoredRoomCode());
   const [activeClassId, setActiveClassId] = useState<string>(() => {
     const data = loadAppData();
     return data.classes[0]?.id || '';
@@ -89,6 +96,32 @@ export default function App() {
       unsub();
     };
   }, [isCloudSyncActive]);
+
+  // Real-time Classroom Room Code synchronization listener (手機 ⇋ 大螢幕即時雙向連動)
+  useEffect(() => {
+    if (!roomCode) return;
+
+    let unsub = () => {};
+    ensureTeacherAuth().then(() => {
+      unsub = subscribeToRoom(
+        roomCode,
+        (partial) => {
+          setAppData((prev) => {
+            const merged = { ...prev, ...partial };
+            saveAppData(merged);
+            return merged;
+          });
+        },
+        (err) => {
+          console.warn('Room code sync notice:', err.message);
+        }
+      );
+    });
+
+    return () => {
+      unsub();
+    };
+  }, [roomCode]);
 
   // Active class object
   const activeClass = useMemo(() => {
@@ -207,8 +240,15 @@ export default function App() {
           console.warn('Cloud status sync deferred/offline:', err);
         });
       }
+
+      // Synchronize with Classroom Room Code in background (手機 ⇋ 大螢幕即時連線)
+      if (roomCode) {
+        updateRoomStatus(roomCode, activeAssignment.id, studentId, student.seatNumber, next).catch((err) => {
+          console.warn('Room status sync notice:', err);
+        });
+      }
     },
-    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive]
+    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive, roomCode]
   );
 
   // Directly set student status (for brush mode or direct button)
@@ -265,8 +305,15 @@ export default function App() {
           console.warn('Cloud status sync deferred/offline:', err);
         });
       }
+
+      // Synchronize with Classroom Room Code in background (手機 ⇋ 大螢幕即時連線)
+      if (roomCode) {
+        updateRoomStatus(roomCode, activeAssignment.id, studentId, student.seatNumber, targetStatus).catch((err) => {
+          console.warn('Room status sync notice:', err);
+        });
+      }
     },
-    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive]
+    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive, roomCode]
   );
 
   // Quick reset single student to pending
@@ -689,6 +736,7 @@ export default function App() {
         canUndo={undoStack.length > 0}
         onUndo={handleUndo}
         isCloudSyncActive={isCloudSyncActive}
+        roomCode={roomCode}
       />
 
       {/* 2. Assignment Management Bar */}
@@ -795,10 +843,21 @@ export default function App() {
           appData={appData}
           activeClass={activeClass}
           activeAssignment={activeAssignment}
-          onImportData={(data) => {
+          onImportData={async (data) => {
             updateAppDataAndSave(data);
             setActiveClassId(data.classes[0]?.id || '');
             setActiveAssignmentId(data.assignments[0]?.id || '');
+            try {
+              const user = auth.currentUser || (await ensureTeacherAuth());
+              if (user) {
+                await uploadAppDataToCloud(user.uid, data);
+              }
+              if (roomCode) {
+                await uploadRoomData(roomCode, data);
+              }
+            } catch (err) {
+              console.warn('Sync imported data to cloud/room notice:', err);
+            }
           }}
           onResetData={handleResetData}
           onDownloadStandaloneHtml={handleDownloadStandaloneHtml}
@@ -810,6 +869,7 @@ export default function App() {
         onClose={() => {
           setIsFirebaseOpen(false);
           setIsCloudSyncActive(localStorage.getItem('checkhw_cloud_sync_enabled') === 'true');
+          setRoomCode(getStoredRoomCode());
         }}
         appData={appData}
         onSyncDataFromCloud={(partial) => {
@@ -819,6 +879,8 @@ export default function App() {
             return merged;
           });
         }}
+        roomCode={roomCode}
+        onUpdateRoomCode={(code) => setRoomCode(code)}
       />
 
       <DevLogModal

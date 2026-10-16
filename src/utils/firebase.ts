@@ -64,6 +64,32 @@ export async function ensureTeacherAuth(): Promise<User | null> {
 export async function uploadAppDataToCloud(userId: string, data: AppData): Promise<void> {
   const batch = writeBatch(db);
 
+  // Clean up existing classes/students/assignments not present in the new dataset
+  try {
+    const [oldClasses, oldStudents, oldAssignments] = await Promise.all([
+      getDocs(collection(db, 'users', userId, 'classes')),
+      getDocs(collection(db, 'users', userId, 'students')),
+      getDocs(collection(db, 'users', userId, 'assignments')),
+    ]);
+
+    const newClassIds = new Set(data.classes.map((c) => c.id));
+    oldClasses.forEach((d) => {
+      if (!newClassIds.has(d.id)) batch.delete(d.ref);
+    });
+
+    const newStudentIds = new Set(data.students.map((s) => s.id));
+    oldStudents.forEach((d) => {
+      if (!newStudentIds.has(d.id)) batch.delete(d.ref);
+    });
+
+    const newAssignmentIds = new Set(data.assignments.map((a) => a.id));
+    oldAssignments.forEach((d) => {
+      if (!newAssignmentIds.has(d.id)) batch.delete(d.ref);
+    });
+  } catch (e) {
+    console.warn('Old docs cleanup skipped or offline:', e);
+  }
+
   // Upload classes
   for (const cls of data.classes) {
     const ref = doc(db, 'users', userId, 'classes', cls.id);
@@ -179,4 +205,117 @@ export async function updateCloudStatus(
     teacherId: userId,
   };
   await setDoc(ref, payload);
+}
+
+// ==========================================
+// 🏫 教室配對碼 (Classroom Room Code Sync)
+// ==========================================
+
+export const ROOM_CODE_STORAGE_KEY = 'checkhw_classroom_room_code';
+
+export function getStoredRoomCode(): string {
+  return localStorage.getItem(ROOM_CODE_STORAGE_KEY) || '';
+}
+
+export function setStoredRoomCode(code: string): void {
+  const clean = code.trim();
+  if (clean) {
+    localStorage.setItem(ROOM_CODE_STORAGE_KEY, clean);
+  } else {
+    localStorage.removeItem(ROOM_CODE_STORAGE_KEY);
+  }
+}
+
+// Upload/push full AppData into a Classroom Room
+export async function uploadRoomData(roomCode: string, data: AppData): Promise<void> {
+  const cleanCode = roomCode.trim();
+  if (!cleanCode) throw new Error('請輸入有效的教室代碼');
+
+  const roomRef = doc(db, 'syncRooms', cleanCode);
+  await setDoc(roomRef, {
+    data,
+    updatedAt: Date.now(),
+  }, { merge: true });
+
+  // Also push individual statuses for fast sub-millisecond atomic updates
+  const batch = writeBatch(db);
+  for (const status of data.statuses) {
+    const statusRef = doc(db, 'syncRooms', cleanCode, 'statuses', status.id);
+    batch.set(statusRef, status);
+  }
+  await batch.commit();
+}
+
+// Subscribe to a Classroom Room (both full dataset & real-time statuses)
+export function subscribeToRoom(
+  roomCode: string,
+  onDataUpdate: (data: Partial<AppData>) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const cleanCode = roomCode.trim();
+  if (!cleanCode) return () => {};
+
+  let lastKnownTimestamp = 0;
+
+  // 1. Listen to full room document (for classes, students, assignments)
+  const unsubRoom = onSnapshot(
+    doc(db, 'syncRooms', cleanCode),
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.data();
+        if (val?.data && val?.updatedAt && val.updatedAt > lastKnownTimestamp) {
+          lastKnownTimestamp = val.updatedAt;
+          onDataUpdate(val.data as AppData);
+        }
+      }
+    },
+    (err) => {
+      console.warn('Room listener warning/offline:', err.message);
+      if (onError) onError(err);
+    }
+  );
+
+  // 2. Listen to real-time status updates (atomic seat taps)
+  const unsubStatuses = onSnapshot(
+    collection(db, 'syncRooms', cleanCode, 'statuses'),
+    (snapshot) => {
+      const statuses = snapshot.docs.map((d) => d.data() as SubmissionStatus);
+      if (statuses.length > 0) {
+        onDataUpdate({ statuses });
+      }
+    },
+    (err) => {
+      console.warn('Room statuses listener warning/offline:', err.message);
+      if (onError) onError(err);
+    }
+  );
+
+  return () => {
+    unsubRoom();
+    unsubStatuses();
+  };
+}
+
+// Update single student status in Classroom Room
+export async function updateRoomStatus(
+  roomCode: string,
+  assignmentId: string,
+  studentId: string,
+  seatNumber: number,
+  status: StatusType
+): Promise<void> {
+  const cleanCode = roomCode.trim();
+  if (!cleanCode) return;
+
+  const statusId = `${assignmentId}_${studentId}`;
+  const statusRef = doc(db, 'syncRooms', cleanCode, 'statuses', statusId);
+  const payload: SubmissionStatus = {
+    id: statusId,
+    assignmentId,
+    studentId,
+    seatNumber,
+    status,
+    updatedAt: Date.now(),
+  };
+  await setDoc(statusRef, payload);
 }
