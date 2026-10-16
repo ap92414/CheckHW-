@@ -160,7 +160,7 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
             }`}
           >
             <Key className="w-3.5 h-3.5" />
-            <span>教室代碼配對（最推薦）</span>
+            <span>教室代碼配對</span>
           </button>
           <button
             onClick={() => setActiveTab('sync')}
@@ -248,15 +248,15 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
                     type="text"
                     value={inputRoomCode}
                     onChange={(e) => setInputRoomCode(e.target.value.toUpperCase())}
-                    placeholder="請輸入代碼，如：706"
+                    placeholder="請輸入代碼，如：701"
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-xl font-bold font-mono text-base tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800"
                   />
                   <button
                     type="button"
-                    onClick={() => setInputRoomCode('706')}
+                    onClick={() => setInputRoomCode('')}
                     className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
                   >
-                    填入 706
+                    填入代碼
                   </button>
                 </div>
 
@@ -273,7 +273,7 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
                       <span className="font-bold text-blue-900 text-xs">📱 手機/主電腦：上傳綁定</span>
                     </div>
                     <p className="text-[11px] text-blue-700 leading-normal">
-                      將您目前的 706 班級、學生與作業上傳到【{inputRoomCode || '706'}】雲端空間。
+                      將您目前的班級、學生與作業上傳到【{inputRoomCode || '班級代碼'}】雲端空間。
                     </p>
                   </button>
 
@@ -288,7 +288,7 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
                       <span className="font-bold text-emerald-900 text-xs">🖥️ 大螢幕/iPad：加入連線</span>
                     </div>
                     <p className="text-[11px] text-emerald-700 leading-normal">
-                      立即載入【{inputRoomCode || '706'}】的最新名單，開機永遠記住此代碼！
+                      立即載入【{inputRoomCode || '班級代碼'}】的最新名單，開機永遠記住此代碼！
                     </p>
                   </button>
                 </div>
@@ -303,11 +303,11 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-600 leading-relaxed">
                   <div className="p-2 bg-white rounded-lg border border-slate-200">
                     <strong className="text-slate-800 block mb-0.5">1. 手機端</strong>
-                    輸入 706 點「上傳綁定」，手機拿在手上巡視走道。
+                    輸入【{inputRoomCode || '班級代碼'}】，點「上傳綁定」，手機拿在手上巡視走道。
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-200">
                     <strong className="text-slate-800 block mb-0.5">2. 教室黑板大螢幕</strong>
-                    輸入 706 點「加入連線」，投影出 706 班座號名單。
+                    輸入 【{inputRoomCode || '班級代碼'}】， 點「加入連線」，投影出該班座號名單。
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-200">
                     <strong className="text-slate-800 block mb-0.5">3. 巡堂即時跳動</strong>
