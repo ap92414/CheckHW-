@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /classes/{classId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(classId);
+      }
+
+      match /students/{studentId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(studentId);
+      }
+
+      match /assignments/{assignmentId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(assignmentId);
+      }
+
+      match /statuses/{statusId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(statusId);
+      }
+    }
+
+    match /syncRooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+    }
+
+    match /test/connection {
+      allow read, write: if true;
+    }
+  }
+}

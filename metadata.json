@@ -1,0 +1,6 @@
+{
+  "name": "CheckHW 班級作業清點工具",
+  "description": "專為國中/國小教師設計的班級作業快速清點工具，支援座號三態切換、即時統計、LINE格式摘要複製與本機保存。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

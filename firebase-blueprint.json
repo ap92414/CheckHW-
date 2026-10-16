@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "Class": {
+      "title": "Class",
+      "description": "Class record created by a teacher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "studentCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["id", "name", "studentCount", "createdAt", "teacherId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student in a class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "seatNumber": { "type": "number" },
+        "name": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["id", "classId", "seatNumber", "name", "isActive", "teacherId"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Homework assignment tracked by teacher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "isArchived": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["id", "classId", "title", "date", "isArchived", "createdAt", "teacherId"]
+    },
+    "SubmissionStatus": {
+      "title": "SubmissionStatus",
+      "description": "Atomic submission status per student per assignment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "seatNumber": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "need-fix"] },
+        "updatedAt": { "type": "number" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["id", "assignmentId", "studentId", "seatNumber", "status", "updatedAt", "teacherId"]
+    },
+    "SyncRoom": {
+      "title": "SyncRoom",
+      "description": "Room for multi-device sync between classroom PC and mobile phone",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "classId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastActive": { "type": "number" }
+      },
+      "required": ["id", "code", "classId", "teacherId", "createdAt", "lastActive"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/classes/{classId}": {
+      "schema": { "$ref": "#/entities/Class" },
+      "description": "Teacher classes"
+    },
+    "/users/{userId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Teacher students"
+    },
+    "/users/{userId}/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Teacher assignments"
+    },
+    "/users/{userId}/statuses/{statusId}": {
+      "schema": { "$ref": "#/entities/SubmissionStatus" },
+      "description": "Teacher submission statuses"
+    },
+    "/syncRooms/{roomId}": {
+      "schema": { "$ref": "#/entities/SyncRoom" },
+      "description": "Cross-device pairing rooms"
+    }
+  }
+}

@@ -1,0 +1,830 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+  loadAppData, 
+  saveAppData, 
+  getNextStatus, 
+  generateInitialData,
+  getTodayDateString 
+} from './utils/storage';
+import { 
+  AppData, 
+  ClassRecord, 
+  AssignmentRecord, 
+  StudentRecord, 
+  SubmissionStatus, 
+  StatusType, 
+  HistoryAction 
+} from './types';
+import { calculateStats } from './utils/formatSummary';
+import { Header } from './components/Header';
+import { AssignmentBar } from './components/AssignmentBar';
+import { StatsBar } from './components/StatsBar';
+import { StudentGrid } from './components/StudentGrid';
+import { SummaryModal } from './components/SummaryModal';
+import { ClassManageModal } from './components/ClassManageModal';
+import { AssignmentModal } from './components/AssignmentModal';
+import { BackupModal } from './components/BackupModal';
+import { FirebaseModal } from './components/FirebaseModal';
+import { DevLogModal } from './components/DevLogModal';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { 
+  auth, 
+  ensureTeacherAuth, 
+  updateCloudStatus, 
+  subscribeToTeacherData 
+} from './utils/firebase';
+
+export default function App() {
+  const [appData, setAppData] = useState<AppData>(() => loadAppData());
+  const [activeClassId, setActiveClassId] = useState<string>(() => {
+    const data = loadAppData();
+    return data.classes[0]?.id || '';
+  });
+
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string>(() => {
+    const data = loadAppData();
+    const classId = data.classes[0]?.id;
+    const match = data.assignments.find((a) => a.classId === classId && !a.isArchived);
+    return match?.id || data.assignments[0]?.id || '';
+  });
+
+  // Undo history stack
+  const [undoStack, setUndoStack] = useState<HistoryAction[]>([]);
+
+  // Modals visibility
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isClassManageOpen, setIsClassManageOpen] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [assignmentToEdit, setAssignmentToEdit] = useState<AssignmentRecord | null>(null);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isFirebaseOpen, setIsFirebaseOpen] = useState(false);
+  const [isDevLogOpen, setIsDevLogOpen] = useState(false);
+  const [isCloudSyncActive, setIsCloudSyncActive] = useState<boolean>(() => {
+    return localStorage.getItem('checkhw_cloud_sync_enabled') === 'true';
+  });
+
+  // Real-time Firestore synchronization listener
+  useEffect(() => {
+    if (!isCloudSyncActive) return;
+
+    let unsub = () => {};
+    ensureTeacherAuth().then((user) => {
+      if (!user) return;
+      unsub = subscribeToTeacherData(
+        user.uid,
+        (partial) => {
+          setAppData((prev) => {
+            const merged = { ...prev, ...partial };
+            saveAppData(merged);
+            return merged;
+          });
+        },
+        (err) => {
+          console.warn('Firestore sync listener notice:', err.message);
+        }
+      );
+    });
+
+    return () => {
+      unsub();
+    };
+  }, [isCloudSyncActive]);
+
+  // Active class object
+  const activeClass = useMemo(() => {
+    return appData.classes.find((c) => c.id === activeClassId) || appData.classes[0];
+  }, [appData.classes, activeClassId]);
+
+  // Active class's assignments
+  const classAssignments = useMemo(() => {
+    if (!activeClass) return [];
+    return appData.assignments.filter((a) => a.classId === activeClass.id);
+  }, [appData.assignments, activeClass]);
+
+  // Active assignment object
+  const activeAssignment = useMemo(() => {
+    const found = classAssignments.find((a) => a.id === activeAssignmentId);
+    if (found) return found;
+    return classAssignments.find((a) => !a.isArchived) || classAssignments[0];
+  }, [classAssignments, activeAssignmentId]);
+
+  // Keep activeAssignmentId synchronized if class changes
+  useEffect(() => {
+    if (activeClass) {
+      const match = appData.assignments.find((a) => a.classId === activeClass.id && !a.isArchived);
+      if (match) {
+        setActiveAssignmentId(match.id);
+      } else {
+        const anyMatch = appData.assignments.find((a) => a.classId === activeClass.id);
+        if (anyMatch) {
+          setActiveAssignmentId(anyMatch.id);
+        }
+      }
+    }
+  }, [activeClassId]);
+
+  // Students of active class
+  const classStudents = useMemo(() => {
+    if (!activeClass) return [];
+    return appData.students.filter((s) => s.classId === activeClass.id);
+  }, [appData.students, activeClass]);
+
+  // Calculated statistics
+  const currentStats = useMemo(() => {
+    if (!activeAssignment) {
+      return {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        needFix: 0,
+        completedPercent: 0,
+        pendingSeats: [],
+        needFixSeats: [],
+        completedSeats: [],
+      };
+    }
+    return calculateStats(classStudents, appData.statuses, activeAssignment.id);
+  }, [classStudents, appData.statuses, activeAssignment]);
+
+  // Persist appData whenever it changes
+  const updateAppDataAndSave = useCallback((newData: AppData) => {
+    setAppData(newData);
+    saveAppData(newData);
+  }, []);
+
+  // Cycle student status: pending -> completed -> need-fix -> pending
+  const handleToggleStudentStatus = useCallback(
+    (studentId: string, currentStatus: StatusType) => {
+      if (!activeAssignment) return;
+
+      const next = getNextStatus(currentStatus);
+      const student = classStudents.find((s) => s.id === studentId);
+      if (!student) return;
+
+      // Push to undo stack (keep up to 30 items)
+      setUndoStack((prev) => [
+        {
+          assignmentId: activeAssignment.id,
+          studentId,
+          previousStatus: currentStatus,
+          newStatus: next,
+          timestamp: Date.now(),
+        },
+        ...prev.slice(0, 29),
+      ]);
+
+      const statusKey = `${activeAssignment.id}_${studentId}`;
+      const existingIndex = appData.statuses.findIndex(
+        (st) => st.assignmentId === activeAssignment.id && st.studentId === studentId
+      );
+
+      let updatedStatuses = [...appData.statuses];
+      if (existingIndex >= 0) {
+        updatedStatuses[existingIndex] = {
+          ...updatedStatuses[existingIndex],
+          status: next,
+          updatedAt: Date.now(),
+        };
+      } else {
+        updatedStatuses.push({
+          id: statusKey,
+          assignmentId: activeAssignment.id,
+          studentId,
+          seatNumber: student.seatNumber,
+          status: next,
+          updatedAt: Date.now(),
+        });
+      }
+
+      updateAppDataAndSave({
+        ...appData,
+        statuses: updatedStatuses,
+      });
+
+      // Synchronize with Cloud Firestore in background
+      if (isCloudSyncActive && auth.currentUser) {
+        updateCloudStatus(auth.currentUser.uid, activeAssignment.id, studentId, student.seatNumber, next).catch((err) => {
+          console.warn('Cloud status sync deferred/offline:', err);
+        });
+      }
+    },
+    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive]
+  );
+
+  // Directly set student status (for brush mode or direct button)
+  const handleSetStudentStatus = useCallback(
+    (studentId: string, targetStatus: StatusType) => {
+      if (!activeAssignment) return;
+      const student = classStudents.find((s) => s.id === studentId);
+      if (!student) return;
+
+      const existingIndex = appData.statuses.findIndex(
+        (st) => st.assignmentId === activeAssignment.id && st.studentId === studentId
+      );
+      const prevStatus = existingIndex >= 0 ? appData.statuses[existingIndex].status : 'pending';
+
+      if (prevStatus === targetStatus) return;
+
+      setUndoStack((prev) => [
+        {
+          assignmentId: activeAssignment.id,
+          studentId,
+          previousStatus: prevStatus,
+          newStatus: targetStatus,
+          timestamp: Date.now(),
+        },
+        ...prev.slice(0, 29),
+      ]);
+
+      let updatedStatuses = [...appData.statuses];
+      if (existingIndex >= 0) {
+        updatedStatuses[existingIndex] = {
+          ...updatedStatuses[existingIndex],
+          status: targetStatus,
+          updatedAt: Date.now(),
+        };
+      } else {
+        updatedStatuses.push({
+          id: `${activeAssignment.id}_${studentId}`,
+          assignmentId: activeAssignment.id,
+          studentId,
+          seatNumber: student.seatNumber,
+          status: targetStatus,
+          updatedAt: Date.now(),
+        });
+      }
+
+      updateAppDataAndSave({
+        ...appData,
+        statuses: updatedStatuses,
+      });
+
+      // Synchronize with Cloud Firestore in background
+      if (isCloudSyncActive && auth.currentUser) {
+        updateCloudStatus(auth.currentUser.uid, activeAssignment.id, studentId, student.seatNumber, targetStatus).catch((err) => {
+          console.warn('Cloud status sync deferred/offline:', err);
+        });
+      }
+    },
+    [activeAssignment, classStudents, appData, updateAppDataAndSave, isCloudSyncActive]
+  );
+
+  // Quick reset single student to pending
+  const handleResetStudentStatus = useCallback(
+    (studentId: string) => {
+      if (!activeAssignment) return;
+      const student = classStudents.find((s) => s.id === studentId);
+      if (!student) return;
+
+      const existingIndex = appData.statuses.findIndex(
+        (st) => st.assignmentId === activeAssignment.id && st.studentId === studentId
+      );
+
+      const prevStatus = existingIndex >= 0 ? appData.statuses[existingIndex].status : 'pending';
+      if (prevStatus === 'pending') return;
+
+      setUndoStack((prev) => [
+        {
+          assignmentId: activeAssignment.id,
+          studentId,
+          previousStatus: prevStatus,
+          newStatus: 'pending',
+          timestamp: Date.now(),
+        },
+        ...prev.slice(0, 29),
+      ]);
+
+      let updatedStatuses = [...appData.statuses];
+      if (existingIndex >= 0) {
+        updatedStatuses[existingIndex] = {
+          ...updatedStatuses[existingIndex],
+          status: 'pending',
+          updatedAt: Date.now(),
+        };
+      } else {
+        updatedStatuses.push({
+          id: `${activeAssignment.id}_${studentId}`,
+          assignmentId: activeAssignment.id,
+          studentId,
+          seatNumber: student.seatNumber,
+          status: 'pending',
+          updatedAt: Date.now(),
+        });
+      }
+
+      updateAppDataAndSave({
+        ...appData,
+        statuses: updatedStatuses,
+      });
+    },
+    [activeAssignment, classStudents, appData, updateAppDataAndSave]
+  );
+
+  // Undo last action
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const [lastAction, ...remainingStack] = undoStack;
+
+    const existingIndex = appData.statuses.findIndex(
+      (st) => st.assignmentId === lastAction.assignmentId && st.studentId === lastAction.studentId
+    );
+
+    let updatedStatuses = [...appData.statuses];
+    if (existingIndex >= 0) {
+      updatedStatuses[existingIndex] = {
+        ...updatedStatuses[existingIndex],
+        status: lastAction.previousStatus,
+        updatedAt: Date.now(),
+      };
+    }
+
+    setUndoStack(remainingStack);
+    updateAppDataAndSave({
+      ...appData,
+      statuses: updatedStatuses,
+    });
+  }, [undoStack, appData, updateAppDataAndSave]);
+
+  // Keyboard shortcut Ctrl+Z / Cmd+Z for undo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        if (undoStack.length > 0 && !isSummaryOpen && !isClassManageOpen && !isAssignmentModalOpen && !isBackupOpen) {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, undoStack, isSummaryOpen, isClassManageOpen, isAssignmentModalOpen, isBackupOpen]);
+
+  // Batch status: All completed or All pending
+  const handleBatchSetStatus = (status: 'completed' | 'pending') => {
+    if (!activeAssignment) return;
+    const activeStudents = classStudents.filter((s) => s.isActive);
+
+    const updatedStatuses = [...appData.statuses];
+    activeStudents.forEach((student) => {
+      const idx = updatedStatuses.findIndex(
+        (st) => st.assignmentId === activeAssignment.id && st.studentId === student.id
+      );
+      if (idx >= 0) {
+        updatedStatuses[idx] = {
+          ...updatedStatuses[idx],
+          status,
+          updatedAt: Date.now(),
+        };
+      } else {
+        updatedStatuses.push({
+          id: `${activeAssignment.id}_${student.id}`,
+          assignmentId: activeAssignment.id,
+          studentId: student.id,
+          seatNumber: student.seatNumber,
+          status,
+          updatedAt: Date.now(),
+        });
+      }
+    });
+
+    updateAppDataAndSave({
+      ...appData,
+      statuses: updatedStatuses,
+    });
+  };
+
+  // Create or edit assignment
+  const handleSaveAssignment = (title: string, date: string, id?: string) => {
+    if (!activeClass) return;
+
+    if (id) {
+      // Edit
+      const updated = appData.assignments.map((a) =>
+        a.id === id ? { ...a, title, date } : a
+      );
+      updateAppDataAndSave({ ...appData, assignments: updated });
+    } else {
+      // Create new
+      const newAsg: AssignmentRecord = {
+        id: `asg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        classId: activeClass.id,
+        title,
+        date,
+        isArchived: false,
+        createdAt: Date.now(),
+      };
+      // Initialize pending statuses for active students
+      const newStatuses: SubmissionStatus[] = classStudents.map((s) => ({
+        id: `${newAsg.id}_${s.id}`,
+        assignmentId: newAsg.id,
+        studentId: s.id,
+        seatNumber: s.seatNumber,
+        status: 'pending',
+        updatedAt: Date.now(),
+      }));
+
+      updateAppDataAndSave({
+        ...appData,
+        assignments: [newAsg, ...appData.assignments],
+        statuses: [...appData.statuses, ...newStatuses],
+      });
+      setActiveAssignmentId(newAsg.id);
+    }
+  };
+
+  // Toggle archive assignment
+  const handleToggleArchiveAssignment = (asgId: string) => {
+    const updated = appData.assignments.map((a) =>
+      a.id === asgId ? { ...a, isArchived: !a.isArchived } : a
+    );
+    updateAppDataAndSave({ ...appData, assignments: updated });
+  };
+
+  // Delete assignment (direct delete without window.confirm to prevent iframe suppression)
+  const handleDeleteAssignment = (asgId: string) => {
+    const target = appData.assignments.find((a) => a.id === asgId);
+    if (!target) return;
+
+    const remainingAsgs = appData.assignments.filter((a) => a.id !== asgId);
+    const remainingStatuses = appData.statuses.filter((st) => st.assignmentId !== asgId);
+
+    updateAppDataAndSave({
+      ...appData,
+      assignments: remainingAsgs,
+      statuses: remainingStatuses,
+    });
+
+    const nextActive = remainingAsgs.find((a) => a.classId === activeClassId && !a.isArchived);
+    setActiveAssignmentId(nextActive?.id || remainingAsgs[0]?.id || '');
+  };
+
+  // Add new class
+  const handleAddClass = (name: string, count: number) => {
+    const newClassId = `class_${Date.now()}`;
+    const newClass: ClassRecord = {
+      id: newClassId,
+      name,
+      studentCount: count,
+      createdAt: Date.now(),
+    };
+
+    const newStudents: StudentRecord[] = [];
+    for (let i = 1; i <= count; i++) {
+      newStudents.push({
+        id: `student_${newClassId}_${i}`,
+        classId: newClassId,
+        seatNumber: i,
+        name: '',
+        isActive: true,
+      });
+    }
+
+    const defaultAsg: AssignmentRecord = {
+      id: `asg_${Date.now()}_default`,
+      classId: newClassId,
+      title: '第一份課堂作業',
+      date: getTodayDateString(),
+      isArchived: false,
+      createdAt: Date.now(),
+    };
+
+    const newStatuses: SubmissionStatus[] = newStudents.map((s) => ({
+      id: `${defaultAsg.id}_${s.id}`,
+      assignmentId: defaultAsg.id,
+      studentId: s.id,
+      seatNumber: s.seatNumber,
+      status: 'pending',
+      updatedAt: Date.now(),
+    }));
+
+    updateAppDataAndSave({
+      ...appData,
+      classes: [...appData.classes, newClass],
+      students: [...appData.students, ...newStudents],
+      assignments: [...appData.assignments, defaultAsg],
+      statuses: [...appData.statuses, ...newStatuses],
+    });
+
+    setActiveClassId(newClassId);
+    setActiveAssignmentId(defaultAsg.id);
+  };
+
+  // Update class name
+  const handleUpdateClass = (classId: string, name: string) => {
+    const updated = appData.classes.map((c) =>
+      c.id === classId ? { ...c, name } : c
+    );
+    updateAppDataAndSave({ ...appData, classes: updated });
+  };
+
+  // Delete class
+  const handleDeleteClass = (classId: string) => {
+    if (appData.classes.length <= 1) {
+      alert('請至少保留一個班級！');
+      return;
+    }
+    const remainingClasses = appData.classes.filter((c) => c.id !== classId);
+    const remainingStudents = appData.students.filter((s) => s.classId !== classId);
+    const remainingAssignments = appData.assignments.filter((a) => a.classId !== classId);
+    const deletedAsgIds = new Set(appData.assignments.filter((a) => a.classId === classId).map((a) => a.id));
+    const remainingStatuses = appData.statuses.filter((st) => !deletedAsgIds.has(st.assignmentId));
+
+    updateAppDataAndSave({
+      ...appData,
+      classes: remainingClasses,
+      students: remainingStudents,
+      assignments: remainingAssignments,
+      statuses: remainingStatuses,
+    });
+
+    setActiveClassId(remainingClasses[0].id);
+  };
+
+  // Permanently delete a single student (removes student & cleanup orphan statuses)
+  const handleDeleteStudent = (studentId: string) => {
+    const student = appData.students.find((s) => s.id === studentId);
+    if (!student) return;
+
+    const remainingStudents = appData.students.filter((s) => s.id !== studentId);
+    const remainingStatuses = appData.statuses.filter((st) => st.studentId !== studentId);
+    const updatedClasses = appData.classes.map((c) => {
+      if (c.id === student.classId) {
+        const count = remainingStudents.filter((s) => s.classId === c.id && s.isActive).length;
+        return { ...c, studentCount: count };
+      }
+      return c;
+    });
+
+    updateAppDataAndSave({
+      ...appData,
+      classes: updatedClasses,
+      students: remainingStudents,
+      statuses: remainingStatuses,
+    });
+  };
+
+  // Direct class size resizing (e.g. set to 24 students, automatically trims or adds seats)
+  const handleSetClassCount = (classId: string, targetCount: number) => {
+    if (targetCount <= 0) return;
+    const currentClassStudents = appData.students
+      .filter((s) => s.classId === classId)
+      .sort((a, b) => a.seatNumber - b.seatNumber);
+    const otherStudents = appData.students.filter((s) => s.classId !== classId);
+
+    let updatedClassStudents: StudentRecord[] = [];
+    if (targetCount < currentClassStudents.length) {
+      // Trim to targetCount
+      updatedClassStudents = currentClassStudents.slice(0, targetCount);
+    } else if (targetCount > currentClassStudents.length) {
+      // Add missing seats
+      updatedClassStudents = [...currentClassStudents];
+      const maxSeat = currentClassStudents.reduce((max, s) => Math.max(max, s.seatNumber), 0);
+      for (let i = 1; i <= targetCount - currentClassStudents.length; i++) {
+        const seatNum = maxSeat + i;
+        updatedClassStudents.push({
+          id: `student_${classId}_${seatNum}_${Date.now()}_${i}`,
+          classId,
+          seatNumber: seatNum,
+          name: '',
+          isActive: true,
+        });
+      }
+    } else {
+      return;
+    }
+
+    const validStudentIds = new Set(updatedClassStudents.map((s) => s.id));
+    const cleanedStatuses = appData.statuses.filter((st) => {
+      const asg = appData.assignments.find((a) => a.id === st.assignmentId);
+      if (asg && asg.classId === classId) {
+        return validStudentIds.has(st.studentId);
+      }
+      return true;
+    });
+
+    const updatedClasses = appData.classes.map((c) =>
+      c.id === classId ? { ...c, studentCount: updatedClassStudents.filter((s) => s.isActive).length } : c
+    );
+
+    updateAppDataAndSave({
+      ...appData,
+      classes: updatedClasses,
+      students: [...otherStudents, ...updatedClassStudents],
+      statuses: cleanedStatuses,
+    });
+  };
+
+  // Update student roster
+  const handleUpdateStudents = (classId: string, updatedClassStudents: StudentRecord[]) => {
+    const otherStudents = appData.students.filter((s) => s.classId !== classId);
+    const newStudentCount = updatedClassStudents.filter((s) => s.isActive).length;
+
+    // Clean up orphan statuses
+    const validStudentIds = new Set(updatedClassStudents.map((s) => s.id));
+    const cleanedStatuses = appData.statuses.filter((st) => {
+      const asg = appData.assignments.find((a) => a.id === st.assignmentId);
+      if (asg && asg.classId === classId) {
+        return validStudentIds.has(st.studentId);
+      }
+      return true;
+    });
+
+    const updatedClasses = appData.classes.map((c) =>
+      c.id === classId ? { ...c, studentCount: newStudentCount } : c
+    );
+
+    updateAppDataAndSave({
+      ...appData,
+      classes: updatedClasses,
+      students: [...otherStudents, ...updatedClassStudents],
+      statuses: cleanedStatuses,
+    });
+  };
+
+  // Reset to initial demo data
+  const handleResetData = () => {
+    const initial = generateInitialData();
+    updateAppDataAndSave(initial);
+    setActiveClassId(initial.classes[0].id);
+    setActiveAssignmentId(initial.assignments[0].id);
+    setUndoStack([]);
+  };
+
+  // Standalone HTML generation for download
+  const handleDownloadStandaloneHtml = () => {
+    // Generate standalone index.html content
+    fetch('/standalone.html')
+      .then((res) => {
+        if (!res.ok) throw new Error('not found');
+        return res.text();
+      })
+      .catch(() => {
+        return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CheckHW</title></head><body>CheckHW Standalone Prototype</body></html>`;
+      })
+      .then((content) => {
+        const blob = new Blob([content], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CheckHW_單一檔案免安裝離線版.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-blue-600 selection:text-white pb-12">
+      {/* PWA Install Banner */}
+      <PwaInstallPrompt />
+
+      {/* 1. Top Header */}
+      <Header
+        classes={appData.classes}
+        activeClassId={activeClassId}
+        onSelectClass={setActiveClassId}
+        onOpenClassManage={() => setIsClassManageOpen(true)}
+        onOpenBackup={() => setIsBackupOpen(true)}
+        onOpenFirebase={() => setIsFirebaseOpen(true)}
+        onOpenDevLog={() => setIsDevLogOpen(true)}
+        canUndo={undoStack.length > 0}
+        onUndo={handleUndo}
+        isCloudSyncActive={isCloudSyncActive}
+      />
+
+      {/* 2. Assignment Management Bar */}
+      <AssignmentBar
+        assignments={classAssignments}
+        activeAssignmentId={activeAssignment?.id || ''}
+        onSelectAssignment={setActiveAssignmentId}
+        onOpenCreateAssignment={() => {
+          setAssignmentToEdit(null);
+          setIsAssignmentModalOpen(true);
+        }}
+        onOpenEditAssignment={(asg) => {
+          setAssignmentToEdit(asg);
+          setIsAssignmentModalOpen(true);
+        }}
+        onDeleteAssignment={handleDeleteAssignment}
+        onToggleArchive={handleToggleArchiveAssignment}
+        onBatchSetStatus={handleBatchSetStatus}
+      />
+
+      {/* 3. Core Seat Number Grid (Thumb-friendly & responsive) */}
+      <main className="flex-1">
+        {activeAssignment ? (
+          <StudentGrid
+            students={classStudents}
+            statuses={appData.statuses}
+            assignmentId={activeAssignment.id}
+            onToggleStudentStatus={handleToggleStudentStatus}
+            onSetStudentStatus={handleSetStudentStatus}
+            onResetStudentStatus={handleResetStudentStatus}
+            onDeleteStudent={handleDeleteStudent}
+            onOpenClassManage={() => setIsClassManageOpen(true)}
+            statsBar={
+              <StatsBar
+                stats={currentStats}
+                onOpenSummary={() => setIsSummaryOpen(true)}
+              />
+            }
+          />
+        ) : (
+          <div className="max-w-md mx-auto text-center py-16 px-4">
+            <p className="text-slate-500 mb-4">此班級目前沒有任何清點作業</p>
+            <button
+              onClick={() => {
+                setAssignmentToEdit(null);
+                setIsAssignmentModalOpen(true);
+              }}
+              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow-sm"
+            >
+              立即新增作業
+            </button>
+          </div>
+        )}
+      </main>
+
+      {/* Floating Action Button for Mobile: Quick LINE Summary */}
+      <div className="fixed bottom-4 right-4 sm:hidden z-30">
+        <button
+          onClick={() => setIsSummaryOpen(true)}
+          className="flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full shadow-lg active:scale-95 transition-all text-sm"
+        >
+          <span>LINE 摘要 ({currentStats.pending}未交)</span>
+        </button>
+      </div>
+
+      {/* Modals */}
+      {activeClass && activeAssignment && (
+        <SummaryModal
+          isOpen={isSummaryOpen}
+          onClose={() => setIsSummaryOpen(false)}
+          activeClass={activeClass}
+          activeAssignment={activeAssignment}
+          stats={currentStats}
+        />
+      )}
+
+      {activeClass && (
+        <ClassManageModal
+          isOpen={isClassManageOpen}
+          onClose={() => setIsClassManageOpen(false)}
+          classes={appData.classes}
+          activeClassId={activeClass.id}
+          students={appData.students}
+          onAddClass={handleAddClass}
+          onUpdateClass={handleUpdateClass}
+          onDeleteClass={handleDeleteClass}
+          onUpdateStudents={handleUpdateStudents}
+          onDeleteStudent={handleDeleteStudent}
+          onSetClassCount={handleSetClassCount}
+        />
+      )}
+
+      <AssignmentModal
+        isOpen={isAssignmentModalOpen}
+        onClose={() => setIsAssignmentModalOpen(false)}
+        assignmentToEdit={assignmentToEdit}
+        onSaveAssignment={handleSaveAssignment}
+      />
+
+      {activeClass && (
+        <BackupModal
+          isOpen={isBackupOpen}
+          onClose={() => setIsBackupOpen(false)}
+          appData={appData}
+          activeClass={activeClass}
+          activeAssignment={activeAssignment}
+          onImportData={(data) => {
+            updateAppDataAndSave(data);
+            setActiveClassId(data.classes[0]?.id || '');
+            setActiveAssignmentId(data.assignments[0]?.id || '');
+          }}
+          onResetData={handleResetData}
+          onDownloadStandaloneHtml={handleDownloadStandaloneHtml}
+        />
+      )}
+
+      <FirebaseModal
+        isOpen={isFirebaseOpen}
+        onClose={() => {
+          setIsFirebaseOpen(false);
+          setIsCloudSyncActive(localStorage.getItem('checkhw_cloud_sync_enabled') === 'true');
+        }}
+        appData={appData}
+        onSyncDataFromCloud={(partial) => {
+          setAppData((prev) => {
+            const merged = { ...prev, ...partial };
+            saveAppData(merged);
+            return merged;
+          });
+        }}
+      />
+
+      <DevLogModal
+        isOpen={isDevLogOpen}
+        onClose={() => setIsDevLogOpen(false)}
+      />
+    </div>
+  );
+}

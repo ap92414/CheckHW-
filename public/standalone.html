@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CheckHW 班級作業清點工具（單一檔案版）</title>
+  <!-- Tailwind CSS CDN for Standalone Operation -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          screens: {
+            'xs': '420px',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar and touch optimizations */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    button, input, select, textarea { touch-action: manipulation; }
+  </style>
+</head>
+<body class="bg-slate-100/70 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-blue-600 selection:text-white pb-12">
+
+  <!-- ================= TOP HEADER ================= -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <div class="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+          HW
+        </div>
+        <span class="font-bold text-slate-800 text-base sm:text-lg tracking-tight hidden xs:inline">CheckHW</span>
+
+        <div class="relative inline-block text-left">
+          <select id="classSelector" aria-label="選擇班級" class="bg-slate-100 hover:bg-slate-200 rounded-lg px-2.5 py-1 text-xs sm:text-sm font-semibold text-slate-800 border border-slate-200 cursor-pointer focus:outline-hidden">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <button id="btnOpenClassManage" title="名單設定" class="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium">
+          ⚙️ <span class="hidden sm:inline">名單設定</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <button id="btnUndo" disabled title="復原上一步 (Ctrl+Z)" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 border border-transparent cursor-not-allowed">
+          ↩️ <span class="hidden sm:inline">復原</span>
+        </button>
+
+        <button id="btnOpenBackup" title="資料備份與匯出" class="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-xs font-semibold">
+          💾 <span class="hidden sm:inline">備份</span>
+        </button>
+
+        <button onclick="openModal('modalDevLog')" title="查看完整研發日誌" class="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-slate-200 transition-colors text-xs font-semibold flex items-center gap-1">
+          📝 <span class="hidden sm:inline">研發日誌</span>
+        </button>
+
+        <button id="btnOpenFirebase" class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="hidden md:inline">本機儲存</span>
+          <span class="text-[10px] px-1 bg-white rounded-sm text-slate-500 border border-slate-200">離線安全</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= ASSIGNMENT BAR ================= -->
+  <section class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-3 sm:px-4 py-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-xl">📖</span>
+          <div class="min-w-0">
+            <h1 id="currentAssignmentTitle" class="text-base sm:text-lg font-bold text-slate-900 truncate">--</h1>
+            <div id="currentAssignmentDate" class="text-xs text-slate-500 flex items-center gap-2">--</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="btnBatchComplete" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200">
+            ✓ 全班已交
+          </button>
+          <button id="btnBatchReset" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200">
+            ○ 全班重設
+          </button>
+          <button id="btnEditAssignment" title="編輯作業" class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md border border-slate-200 text-xs">
+            ✏️
+          </button>
+          <button id="btnDeleteAssignment" title="刪除作業" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md border border-slate-200 text-xs">
+            🗑️
+          </button>
+        </div>
+      </div>
+
+      <!-- Assignment Tabs -->
+      <div class="flex items-center gap-2 pt-1.5 border-t border-slate-100 overflow-x-auto no-scrollbar py-0.5">
+        <button id="btnNewAssignment" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all shrink-0 shadow-xs">
+          + 新增作業
+        </button>
+        <div id="assignmentTabsContainer" class="flex items-center gap-1.5">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STATS BAR ================= -->
+  <section class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+      <div class="flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
+        <div class="grid grid-cols-4 gap-2 sm:gap-4 flex-1 min-w-[280px]">
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+            <div class="text-[11px] sm:text-xs font-medium text-slate-500">應交人數</div>
+            <div id="statTotal" class="text-base sm:text-xl font-bold text-slate-800">0</div>
+          </div>
+          <div class="bg-blue-50/70 border border-blue-200/80 rounded-lg p-2 text-center">
+            <div class="text-[11px] sm:text-xs font-semibold text-blue-700">✓ 已交</div>
+            <div id="statCompleted" class="text-base sm:text-xl font-bold text-blue-700">0</div>
+          </div>
+          <div class="bg-slate-100 border border-slate-200 rounded-lg p-2 text-center">
+            <div class="text-[11px] sm:text-xs font-medium text-slate-600">○ 未交</div>
+            <div id="statPending" class="text-base sm:text-xl font-bold text-slate-700">0</div>
+          </div>
+          <div class="bg-rose-50/80 border border-rose-200/80 rounded-lg p-2 text-center">
+            <div class="text-[11px] sm:text-xs font-semibold text-rose-700">! 需訂正</div>
+            <div id="statNeedFix" class="text-base sm:text-xl font-bold text-rose-700">0</div>
+          </div>
+        </div>
+
+        <button id="btnOpenSummary" class="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-xs shrink-0 w-full sm:w-auto">
+          📋 <span>產生 LINE 摘要</span>
+        </button>
+      </div>
+
+      <!-- Segmented Progress Bar -->
+      <div class="mt-2.5">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <span>繳交進度</span>
+          <span id="statPercentText" class="font-semibold text-slate-700">0% 完成</span>
+        </div>
+        <div class="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+          <div id="progressCompleted" class="bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+          <div id="progressNeedFix" class="bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+          <div id="progressPending" class="bg-slate-300 transition-all duration-300" style="width: 100%"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEAT NUMBER GRID ================= -->
+  <main class="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex-1 w-full">
+    <!-- 1. INTUITIVE CLICK MODE SELECTOR -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs mb-3 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+          <span class="text-base">🎯</span>
+          <span>選擇最直覺的點法模式：</span>
+        </div>
+        <div class="text-[11px] text-slate-500 font-medium hidden sm:inline">
+          可依批改情境隨時切換點法
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+        <button id="modeBtnSmart" onclick="setClickMode('smart')" class="mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-blue-600 text-white border-blue-600 shadow-xs font-bold ring-2 ring-blue-600/20">
+          <span class="text-xs font-bold">⚡ 智慧單擊模式</span>
+          <span class="text-[10px] mt-0.5 text-blue-100">點擊切換已交/缺交，角標設訂正</span>
+        </button>
+
+        <button id="modeBtnNeedFix" onclick="setClickMode('stamp-need-fix')" class="mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-rose-50/60 hover:bg-rose-100 text-rose-700 border-rose-200">
+          <span class="text-xs font-semibold">🔴 需訂正筆刷</span>
+          <span class="text-[10px] mt-0.5 text-rose-500">點哪個座號就直接變需訂正</span>
+        </button>
+
+        <button id="modeBtnCompleted" onclick="setClickMode('stamp-completed')" class="mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-blue-50/60 hover:bg-blue-100 text-blue-700 border-blue-200">
+          <span class="text-xs font-semibold">🔵 已交筆刷</span>
+          <span class="text-[10px] mt-0.5 text-blue-500">點哪個座號就直接標記已交</span>
+        </button>
+
+        <button id="modeBtnCycle" onclick="setClickMode('cycle')" class="mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200">
+          <span class="text-xs font-medium">🔄 三態循環點擊</span>
+          <span class="text-[10px] mt-0.5 text-slate-400">缺交 ➔ 已交 ➔ 需訂正</span>
+        </button>
+      </div>
+
+      <div class="px-2.5 py-1.5 bg-slate-100/80 rounded-lg flex items-center justify-between text-[11px] text-slate-600">
+        <div id="modeDescriptionText">
+          ⚡ <strong>智慧單擊模式：</strong> 點擊座號切換「已交 ✓」與「缺交 ○」；若要標記需訂正，點右上角 <strong>[!]</strong> 或右鍵長按！
+        </div>
+        <button onclick="setClickMode('stamp-pending')" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shrink-0 ml-2">
+          ⚪ 缺交筆刷
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Filter & Legend Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-2.5 mb-3 bg-white p-2.5 rounded-xl border border-slate-200">
+      <div class="flex items-center gap-2.5 text-xs text-slate-600 font-medium">
+        <span class="text-slate-400">狀態圖例：</span>
+        <div class="flex items-center gap-1">
+          <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-slate-100 flex items-center justify-center text-[9px] text-slate-600 font-bold">○</span>
+          <span>缺交/未交</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <span class="w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center text-[9px] text-white font-bold">✓</span>
+          <span class="text-blue-700 font-semibold">已交</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <span class="w-3.5 h-3.5 rounded-full bg-rose-600 flex items-center justify-center text-[9px] text-white font-bold">!</span>
+          <span class="text-rose-700 font-semibold">需訂正</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-slate-400 mr-1">篩選:</span>
+        <button data-filter="all" class="filter-btn px-2 py-1 rounded-md bg-slate-800 text-white font-medium">全部</button>
+        <button data-filter="pending" class="filter-btn px-2 py-1 rounded-md text-slate-600 hover:bg-slate-100">缺交名單</button>
+        <button data-filter="need-fix" class="filter-btn px-2 py-1 rounded-md text-slate-600 hover:bg-slate-100">需訂正</button>
+        <button data-filter="completed" class="filter-btn px-2 py-1 rounded-md text-slate-600 hover:bg-slate-100">已交</button>
+      </div>
+    </div>
+
+    <!-- The Grid Container -->
+    <div id="seatGrid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
+      <!-- Generated via JS -->
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-xs text-slate-400 px-1">
+      <span>💡 點擊座號循環切換狀態，電腦版可按右鍵直接設回「未交」</span>
+      <span id="gridFooterStudentCount">--</span>
+    </div>
+  </main>
+
+  <!-- ================= MODAL: SUMMARY ================= -->
+  <div id="modalSummary" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-800">作業繳交文字摘要</h2>
+          <p id="summarySubtitle" class="text-xs text-slate-500">--</p>
+        </div>
+        <button onclick="closeModal('modalSummary')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-3 border-b border-slate-100 bg-white">
+        <label class="block text-xs font-medium text-slate-500 mb-1.5">選擇格式：</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+          <button data-format="detailed" class="format-btn px-2.5 py-1.5 rounded-lg border bg-blue-50 border-blue-600 text-blue-700 font-semibold">完整報告</button>
+          <button data-format="compact" class="format-btn px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">精簡版</button>
+          <button data-format="pending-only" class="format-btn px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">僅未交</button>
+          <button data-format="need-fix-only" class="format-btn px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">僅需訂正</button>
+        </div>
+      </div>
+
+      <div class="p-4 flex-1 overflow-y-auto">
+        <textarea id="summaryTextarea" rows="8" class="w-full text-xs sm:text-sm p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-800 leading-relaxed focus:bg-white focus:outline-hidden"></textarea>
+        <p class="text-[11px] text-slate-400 mt-1">* 內容可自由編輯，座號依數字嚴格由小至大排序。</p>
+      </div>
+
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+        <button onclick="closeModal('modalSummary')" class="px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-200/60 rounded-xl">關閉</button>
+        <button id="btnCopySummary" class="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition-all">
+          📋 一鍵複製摘要
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CLASS & ROSTER ================= -->
+  <div id="modalClass" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-base sm:text-lg font-bold text-slate-800">班級與座號名單設定</h2>
+        <button onclick="closeModal('modalClass')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-4 flex-1 overflow-y-auto space-y-4 text-xs">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <label class="block font-semibold text-slate-700 mb-1">班級名稱</label>
+          <div class="flex gap-2">
+            <input type="text" id="inputClassName" class="flex-1 px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+            <button id="btnSaveClassName" class="px-3 py-1.5 font-semibold bg-slate-800 text-white rounded-lg">儲存名稱</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="font-semibold text-slate-800">學生座號管理</span>
+            <button onclick="openModal('modalImportRoster')" class="px-2.5 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs">
+              📥 批次匯入名單 (CSV/貼上)
+            </button>
+          </div>
+
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-600 font-medium">✂️ 裁切多餘座號：</span>
+              <span class="text-slate-400">保留至</span>
+              <input type="number" id="inputTrimCount" min="1" max="60" value="30" class="w-14 px-1.5 py-1 text-center bg-white border border-slate-300 rounded font-bold text-slate-800" />
+              <span class="text-slate-400">號</span>
+              <button onclick="trimSeats()" class="px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded font-semibold">
+                執行刪除
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button id="btnAddSeat1" class="px-2 py-1 text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200">+ 1 號</button>
+              <button id="btnAddSeat5" class="px-2 py-1 text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200">+ 5 號</button>
+            </div>
+          </div>
+
+          <div id="classRosterList" class="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-slate-100">
+            <!-- Populated via JS -->
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">* 班級人數少時，可點擊垃圾桶刪除多餘號碼，或用「裁切多餘座號」一鍵刪除。</p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200">
+          <form id="formAddClass" class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <span class="font-semibold text-slate-700 block">新增全新班級</span>
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="newClassInputName" required placeholder="如：八年級 2 班" class="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg" />
+              <input type="number" id="newClassInputCount" min="1" max="50" value="30" class="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg" />
+            </div>
+            <button type="submit" class="w-full py-1.5 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ 新增此班級</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end">
+        <button onclick="closeModal('modalClass')" class="px-4 py-2 font-semibold bg-blue-600 text-white rounded-xl">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: ASSIGNMENT FORM ================= -->
+  <div id="modalAssignment" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 id="modalAssignmentTitle" class="text-base sm:text-lg font-bold text-slate-800">新增清點作業</h2>
+        <button onclick="closeModal('modalAssignment')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+
+      <form id="formAssignment" class="p-4 space-y-4 text-xs">
+        <input type="hidden" id="editAssignmentId" value="" />
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">作業名稱 *</label>
+          <input type="text" id="inputAssignmentTitle" required placeholder="例如：數學講義 3-2、國文習作" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden" />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">日期</label>
+          <input type="date" id="inputAssignmentDate" required class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-hidden" />
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalAssignment')" class="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-xl">取消</button>
+          <button type="submit" class="px-4 py-2 font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: BACKUP ================= -->
+  <div id="modalBackup" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-base sm:text-lg font-bold text-slate-800">資料備份與匯出</h2>
+        <button onclick="closeModal('modalBackup')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs flex-1 overflow-y-auto">
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800">
+          ⚠️ <strong>本機儲存提示：</strong> 資料目前安全儲存於此裝置瀏覽器（localStorage），即使重新整理也不會遺失。若更換電腦，可點擊下方下載備份檔進行還原。
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-slate-800 text-sm">完整系統備份 (JSON)</div>
+            <div class="text-slate-500">下載所有班級、學生與作業紀錄</div>
+          </div>
+          <button id="btnExportJSON" class="px-3 py-1.5 bg-slate-800 text-white font-semibold rounded-lg hover:bg-slate-900">下載備份</button>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-slate-800 text-sm">匯出當前作業名單 (CSV)</div>
+            <div class="text-slate-500">供 Excel / Google 試算表統計</div>
+          </div>
+          <button id="btnExportCSV" class="px-3 py-1.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700">匯出 CSV</button>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-slate-800 text-sm">匯入備份檔 (JSON)</div>
+            <div class="text-slate-500">還原先前下載的備份檔案</div>
+          </div>
+          <input type="file" id="fileImportJSON" accept=".json" class="hidden" />
+          <button onclick="document.getElementById('fileImportJSON').click()" class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-100">選擇檔案</button>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200 text-right">
+          <button id="btnResetDemo" class="text-rose-600 hover:underline">重設回初始範例資料</button>
+        </div>
+      </div>
+
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 text-right">
+        <button onclick="closeModal('modalBackup')" class="px-4 py-2 text-xs font-semibold bg-slate-700 text-white rounded-xl">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: FIREBASE INFO ================= -->
+  <div id="modalFirebase" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-base sm:text-lg font-bold text-slate-800">☁️ Firebase 雲端同步規劃（第二階段）</h2>
+        <button onclick="closeModal('modalFirebase')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs flex-1 overflow-y-auto leading-relaxed">
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800">
+          <strong>✅ 第一階段驗收完成：</strong> 完整單一 HTML 原型已可完全在本機流暢操作，支援座號三態循環切換、即時統計、LINE摘要、復原與備份。
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+          <div class="font-bold text-slate-800">第二階段 Cloud Firestore 同步架構：</div>
+          <p>• <strong>原子化狀態更新：</strong> 每個學生狀態獨立儲存於子集合，雙裝置同時點擊不同座號不會互相覆蓋。</p>
+          <p>• <strong>即時監聽 (onSnapshot)：</strong> 手機點擊完成後，教室電腦螢幕立即同步變色。</p>
+          <p>• <strong>離線持久化：</strong> 啟用 offline persistence，教室訊號差時繼續點擊，連網後自動補送。</p>
+        </div>
+
+        <div class="bg-slate-100 p-3 rounded-xl border border-slate-200 font-mono text-[11px] text-slate-700">
+          // 預留 Firestore 集合路徑：<br>
+          classes/{classId}/assignments/{assignmentId}/statuses/{studentId}
+        </div>
+      </div>
+
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 text-right">
+        <button onclick="closeModal('modalFirebase')" class="px-4 py-2 text-xs font-semibold bg-slate-800 text-white rounded-xl">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: IMPORT ROSTER ================= -->
+  <div id="modalImportRoster" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-base sm:text-lg font-bold text-slate-800">📥 批次匯入學生名單</h2>
+        <button onclick="closeModal('modalImportRoster')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs flex-1 overflow-y-auto">
+        <p class="text-slate-600">請貼上學生名單文字（支援「1 王小明」格式，或每行一個姓名）：</p>
+        <textarea id="importRosterTextarea" rows="8" placeholder="1 王小明&#10;2 李小美&#10;3 陳大華" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs focus:outline-hidden"></textarea>
+        <p class="text-[11px] text-slate-400">* 匯入後將自動依學生數量設定座號，刪除多餘號碼。</p>
+      </div>
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+        <button onclick="closeModal('modalImportRoster')" class="px-3 py-2 text-xs text-slate-600 rounded-xl">取消</button>
+        <button onclick="applyImportRoster()" class="px-4 py-2 font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700">確認匯入名單</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: DEV LOG ================= -->
+  <div id="modalDevLog" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-800">📝 CheckHW 研發日誌 (Development Log)</h2>
+          <p class="text-xs text-slate-500">版本演進、教學現場回饋修正與架構決策</p>
+        </div>
+        <button onclick="closeModal('modalDevLog')" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs flex-1 overflow-y-auto leading-relaxed">
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+          <div class="font-bold text-blue-900 mb-1">v1.2.0 (現場優化：名單匯入、座號裁切、狀態雙顯與研發日誌)</div>
+          <ul class="list-disc pl-4 text-slate-700 space-y-0.5">
+            <li><strong>名單匯入：</strong> 支援文字貼上與 CSV 匯入，自動解析座號姓名。</li>
+            <li><strong>座號精簡：</strong> 支援個別座號垃圾桶刪除與批次保留至 X 號裁切。</li>
+            <li><strong>狀態雙顯：</strong> 修正輸入學生姓名後「缺交/已交/需訂正」字樣被蓋過之問題。</li>
+            <li><strong>研發日誌：</strong> 完整留存開發歷史於 <code>DEVELOPMENT_LOG.md</code>。</li>
+          </ul>
+        </div>
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div class="font-bold text-slate-800 mb-1">v1.1.0 (操作革新：四大直覺點法模式)</div>
+          <ul class="list-disc pl-4 text-slate-600 space-y-0.5">
+            <li>🔴 需訂正筆刷、🔵 已交筆刷、⚪ 缺交筆刷、⚡ 智慧單擊模式、長按三合一快選。</li>
+          </ul>
+        </div>
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div class="font-bold text-slate-800 mb-1">v1.0.0 (第一階段：全功能單一原型與本機持久化)</div>
+          <ul class="list-disc pl-4 text-slate-600 space-y-0.5">
+            <li>座號循環、LINE 摘要數值排序、localStorage 保存、JSON/CSV 備份。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="p-3.5 border-t border-slate-200 bg-slate-50 text-right">
+        <button onclick="closeModal('modalDevLog')" class="px-4 py-2 font-semibold bg-slate-800 text-white rounded-xl">關閉日誌</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Mobile Action Button -->
+  <div class="fixed bottom-4 right-4 sm:hidden z-30">
+    <button onclick="openSummaryModal()" class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full shadow-lg active:scale-95 text-sm">
+      📋 LINE 摘要 (<span id="fabPendingCount">0</span>未交)
+    </button>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 bg-slate-900/90 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xl transition-all">
+    已複製到剪貼簿！
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // ---------- DATA SCHEMA & STORAGE ----------
+    const STORAGE_KEY = 'checkhw_classroom_data_v1';
+    let appData = null;
+    let activeClassId = '';
+    let activeAssignmentId = '';
+    let currentFilter = 'all';
+    let currentSummaryFormat = 'detailed';
+    let undoStack = [];
+
+    function getTodayString() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function generateInitialData() {
+      const classId = 'class_default_701';
+      const students = [];
+      for (let i = 1; i <= 30; i++) {
+        students.push({
+          id: `student_${classId}_${i}`,
+          classId: classId,
+          seatNumber: i,
+          name: '',
+          isActive: true
+        });
+      }
+      const today = getTodayString();
+      const asg1 = { id: 'asg_math_01', classId, title: '數學講義 3-2', date: today, isArchived: false };
+      const asg2 = { id: 'asg_chinese_01', classId, title: '國文習作 第五課', date: today, isArchived: false };
+      
+      const statuses = [];
+      students.forEach(s => {
+        let st = 'completed';
+        if ([5, 12, 23].includes(s.seatNumber)) st = 'pending';
+        else if ([3, 18].includes(s.seatNumber)) st = 'need-fix';
+        statuses.push({ id: `${asg1.id}_${s.id}`, assignmentId: asg1.id, studentId: s.id, seatNumber: s.seatNumber, status: st });
+        statuses.push({ id: `${asg2.id}_${s.id}`, assignmentId: asg2.id, studentId: s.id, seatNumber: s.seatNumber, status: 'pending' });
+      });
+
+      return {
+        version: 1,
+        classes: [{ id: classId, name: '七年級 1 班', studentCount: 30, createdAt: Date.now() }],
+        students,
+        assignments: [asg1, asg2],
+        statuses
+      };
+    }
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return generateInitialData();
+        const parsed = JSON.parse(raw);
+        if (!parsed.classes || !parsed.students) return generateInitialData();
+        return parsed;
+      } catch(e) {
+        return generateInitialData();
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      } catch(e) {
+        console.error('Save failed', e);
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 2200);
+    }
+
+    // ---------- MODALS ----------
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+      document.getElementById(id).classList.add('flex');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+      document.getElementById(id).classList.remove('flex');
+    }
+
+    // ---------- STATUS MODES & ACTIONS ----------
+    let currentClickMode = 'smart';
+    let activePopoverId = null;
+
+    function setClickMode(mode) {
+      currentClickMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(b => {
+        b.className = 'mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200';
+      });
+      const descEl = document.getElementById('modeDescriptionText');
+      if (mode === 'smart') {
+        document.getElementById('modeBtnSmart').className = 'mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-blue-600 text-white border-blue-600 shadow-xs font-bold ring-2 ring-blue-600/20';
+        descEl.innerHTML = '⚡ <strong>智慧單擊模式：</strong> 點擊座號切換「已交 ✓」與「缺交 ○」；右上角 <strong>[!]</strong> 或右鍵直接標記需訂正！';
+      } else if (mode === 'stamp-need-fix') {
+        document.getElementById('modeBtnNeedFix').className = 'mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-rose-600 text-white border-rose-600 shadow-xs font-bold ring-2 ring-rose-600/20';
+        descEl.innerHTML = '🔴 <strong>需訂正筆刷已啟動：</strong> 現在只要輕觸任何座號，立即直接標記為「需訂正」！';
+      } else if (mode === 'stamp-completed') {
+        document.getElementById('modeBtnCompleted').className = 'mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-blue-700 text-white border-blue-700 shadow-xs font-bold ring-2 ring-blue-600/20';
+        descEl.innerHTML = '🔵 <strong>已交筆刷已啟動：</strong> 輕觸任何座號即可直接標記為「已交」！';
+      } else if (mode === 'stamp-pending') {
+        descEl.innerHTML = '⚪ <strong>缺交筆刷已啟動：</strong> 輕觸任何座號即可直接重設為「缺交/未交」！';
+      } else if (mode === 'cycle') {
+        document.getElementById('modeBtnCycle').className = 'mode-btn p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all bg-slate-800 text-white border-slate-800 shadow-xs font-bold ring-2 ring-slate-800/20';
+        descEl.innerHTML = '🔄 <strong>三態循環模式：</strong> 每次點擊依序切換「缺交 ➔ 已交 ➔ 需訂正」。';
+      }
+    }
+
+    function handleSeatClick(studentId) {
+      const existing = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === studentId);
+      const curr = existing ? existing.status : 'pending';
+
+      if (currentClickMode === 'stamp-need-fix') {
+        setStudentStatus(studentId, curr === 'need-fix' ? 'pending' : 'need-fix');
+      } else if (currentClickMode === 'stamp-completed') {
+        setStudentStatus(studentId, curr === 'completed' ? 'pending' : 'completed');
+      } else if (currentClickMode === 'stamp-pending') {
+        setStudentStatus(studentId, 'pending');
+      } else if (currentClickMode === 'cycle') {
+        toggleStudent(studentId);
+      } else {
+        // Smart mode
+        setStudentStatus(studentId, curr === 'pending' ? 'completed' : 'pending');
+      }
+    }
+
+    function handleBadgeClick(e, studentId) {
+      e.stopPropagation();
+      const existing = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === studentId);
+      const curr = existing ? existing.status : 'pending';
+      setStudentStatus(studentId, curr === 'need-fix' ? 'completed' : 'need-fix');
+    }
+
+    function setStudentStatus(studentId, targetStatus) {
+      const existing = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === studentId);
+      const curr = existing ? existing.status : 'pending';
+      if (curr === targetStatus) return;
+
+      undoStack.unshift({ assignmentId: activeAssignmentId, studentId, prev: curr });
+      if (undoStack.length > 30) undoStack.pop();
+      updateUndoButton();
+
+      if (existing) {
+        existing.status = targetStatus;
+      } else {
+        const student = appData.students.find(s => s.id === studentId);
+        appData.statuses.push({
+          id: `${activeAssignmentId}_${studentId}`,
+          assignmentId: activeAssignmentId,
+          studentId,
+          seatNumber: student ? student.seatNumber : 0,
+          status: targetStatus
+        });
+      }
+      saveData();
+      render();
+    }
+
+    function openPopover(e, studentId) {
+      e.preventDefault();
+      e.stopPropagation();
+      activePopoverId = studentId;
+      render();
+    }
+
+    function closePopover() {
+      if (activePopoverId) {
+        activePopoverId = null;
+        render();
+      }
+    }
+    document.addEventListener('click', closePopover);
+
+    function getNextStatus(curr) {
+      if (curr === 'pending') return 'completed';
+      if (curr === 'completed') return 'need-fix';
+      return 'pending';
+    }
+
+    function toggleStudent(studentId) {
+      const existing = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === studentId);
+      const curr = existing ? existing.status : 'pending';
+      const next = getNextStatus(curr);
+
+      undoStack.unshift({ assignmentId: activeAssignmentId, studentId, prev: curr });
+      if (undoStack.length > 30) undoStack.pop();
+      updateUndoButton();
+
+      if (existing) {
+        existing.status = next;
+      } else {
+        const student = appData.students.find(s => s.id === studentId);
+        appData.statuses.push({
+          id: `${activeAssignmentId}_${studentId}`,
+          assignmentId: activeAssignmentId,
+          studentId,
+          seatNumber: student ? student.seatNumber : 0,
+          status: next
+        });
+      }
+      saveData();
+      render();
+    }
+
+    function resetStudent(studentId) {
+      setStudentStatus(studentId, 'pending');
+    }
+
+    function undo() {
+      if (undoStack.length === 0) return;
+      const action = undoStack.shift();
+      updateUndoButton();
+      const existing = appData.statuses.find(s => s.assignmentId === action.assignmentId && s.studentId === action.studentId);
+      if (existing) {
+        existing.status = action.prev;
+        saveData();
+        render();
+      }
+    }
+
+    function updateUndoButton() {
+      const btn = document.getElementById('btnUndo');
+      if (undoStack.length > 0) {
+        btn.disabled = false;
+        btn.className = 'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer';
+      } else {
+        btn.disabled = true;
+        btn.className = 'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 border border-transparent cursor-not-allowed';
+      }
+    }
+
+    // ---------- STATS CALCULATION ----------
+    function getStats() {
+      const activeStudents = appData.students.filter(s => s.classId === activeClassId && s.isActive);
+      const statusMap = new Map();
+      appData.statuses.filter(s => s.assignmentId === activeAssignmentId).forEach(s => statusMap.set(s.studentId, s.status));
+
+      const pendingSeats = [];
+      const needFixSeats = [];
+      const completedSeats = [];
+
+      activeStudents.forEach(st => {
+        const s = statusMap.get(st.id) || 'pending';
+        if (s === 'completed') completedSeats.push(st.seatNumber);
+        else if (s === 'need-fix') needFixSeats.push(st.seatNumber);
+        else pendingSeats.push(st.seatNumber);
+      });
+
+      pendingSeats.sort((a,b)=>a-b);
+      needFixSeats.sort((a,b)=>a-b);
+      completedSeats.sort((a,b)=>a-b);
+
+      const total = activeStudents.length;
+      const completed = completedSeats.length;
+      const pending = pendingSeats.length;
+      const needFix = needFixSeats.length;
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      return { total, completed, pending, needFix, percent, pendingSeats, needFixSeats, completedSeats };
+    }
+
+    // ---------- RENDERING ----------
+    function render() {
+      // 1. Class selector
+      const classSelector = document.getElementById('classSelector');
+      classSelector.innerHTML = appData.classes.map(c => 
+        `<option value="${c.id}" ${c.id === activeClassId ? 'selected':''}>${c.name} (${c.studentCount}人)</option>`
+      ).join('');
+
+      const activeClass = appData.classes.find(c => c.id === activeClassId) || appData.classes[0];
+      const classAssignments = appData.assignments.filter(a => a.classId === activeClassId && !a.isArchived);
+      let activeAsg = classAssignments.find(a => a.id === activeAssignmentId);
+      if (!activeAsg && classAssignments.length > 0) {
+        activeAsg = classAssignments[0];
+        activeAssignmentId = activeAsg.id;
+      }
+
+      // 2. Assignment bar
+      document.getElementById('currentAssignmentTitle').innerText = activeAsg ? activeAsg.title : '尚無作業';
+      document.getElementById('currentAssignmentDate').innerText = activeAsg ? `📅 ${activeAsg.date}` : '';
+
+      const tabsContainer = document.getElementById('assignmentTabsContainer');
+      tabsContainer.innerHTML = classAssignments.map(a => `
+        <button onclick="selectAssignment('${a.id}')" class="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border shrink-0 transition-all ${
+          a.id === activeAssignmentId
+            ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-semibold'
+            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+        }">${a.title}</button>
+      `).join('');
+
+      // 3. Stats
+      const stats = getStats();
+      document.getElementById('statTotal').innerText = stats.total;
+      document.getElementById('statCompleted').innerText = stats.completed;
+      document.getElementById('statPending').innerText = stats.pending;
+      document.getElementById('statNeedFix').innerText = stats.needFix;
+      document.getElementById('statPercentText').innerText = `${stats.percent}% 完成`;
+
+      document.getElementById('progressCompleted').style.width = `${stats.total ? (stats.completed/stats.total)*100 : 0}%`;
+      document.getElementById('progressNeedFix').style.width = `${stats.total ? (stats.needFix/stats.total)*100 : 0}%`;
+      document.getElementById('progressPending').style.width = `${stats.total ? (stats.pending/stats.total)*100 : 100}%`;
+      document.getElementById('fabPendingCount').innerText = stats.pending;
+
+      // 4. Grid
+      const grid = document.getElementById('seatGrid');
+      const activeStudents = appData.students
+        .filter(s => s.classId === activeClassId && s.isActive)
+        .sort((a,b)=>a.seatNumber - b.seatNumber);
+
+      const statusMap = new Map();
+      appData.statuses.filter(s => s.assignmentId === activeAssignmentId).forEach(s => statusMap.set(s.studentId, s.status));
+
+      const filtered = activeStudents.filter(s => {
+        const st = statusMap.get(s.id) || 'pending';
+        if (currentFilter === 'all') return true;
+        return st === currentFilter;
+      });
+
+      document.getElementById('gridFooterStudentCount').innerText = `共 ${activeStudents.length} 名在籍學生`;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400">目前沒有符合「${currentFilter}」狀態的學生</div>`;
+      } else {
+        grid.innerHTML = filtered.map(st => {
+          const status = statusMap.get(st.id) || 'pending';
+          let cls = 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300';
+          let icon = '○';
+          let label = '缺交';
+
+          if (status === 'completed') {
+            cls = 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 ring-2 ring-blue-600/20';
+            icon = '✓';
+            label = '已交';
+          } else if (status === 'need-fix') {
+            cls = 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600 ring-2 ring-rose-600/20';
+            icon = '!';
+            label = '需訂正';
+          }
+
+          const isPopoverOpen = activePopoverId === st.id;
+
+          return `
+            <div class="relative">
+              <button onclick="handleSeatClick('${st.id}')" oncontextmenu="openPopover(event, '${st.id}')"
+                class="w-full relative flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all select-none cursor-pointer active:scale-95 min-h-[76px] sm:min-h-[82px] ${cls}">
+                <span onclick="handleBadgeClick(event, '${st.id}')" title="點擊切換需訂正 (!)" class="absolute top-1.5 right-1.5 p-1 rounded-md text-xs font-bold cursor-pointer hover:scale-125 transition-transform ${
+                  status === 'need-fix' ? 'bg-white text-rose-600 shadow-xs' : (status === 'completed' ? 'text-white' : 'text-slate-400 hover:text-rose-600')
+                }">${icon}</span>
+                <span class="text-xl sm:text-2xl font-black leading-none">${st.seatNumber}</span>
+                ${st.name ? `<span class="text-[11px] truncate max-w-full font-semibold mt-0.5">${st.name}</span>` : ''}
+                <span class="mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  status === 'completed' ? 'bg-blue-800/50 text-white' : (status === 'need-fix' ? 'bg-rose-800/50 text-white' : 'bg-slate-200 text-slate-700')
+                }">${status === 'completed' ? '✓ 已交' : (status === 'need-fix' ? '! 需訂正' : '○ 缺交')}</span>
+              </button>
+
+              ${isPopoverOpen ? `
+                <div class="absolute z-50 -top-12 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl border border-slate-200 p-1 flex items-center gap-1 text-xs shrink-0 whitespace-nowrap">
+                  <button onclick="event.stopPropagation(); setStudentStatus('${st.id}', 'completed'); closePopover();" class="px-2 py-1 bg-blue-600 text-white rounded-lg font-bold">✓ 已交</button>
+                  <button onclick="event.stopPropagation(); setStudentStatus('${st.id}', 'need-fix'); closePopover();" class="px-2 py-1 bg-rose-600 text-white rounded-lg font-bold">! 需訂正</button>
+                  <button onclick="event.stopPropagation(); setStudentStatus('${st.id}', 'pending'); closePopover();" class="px-2 py-1 bg-slate-100 text-slate-700 rounded-lg font-bold">○ 缺交</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function selectAssignment(id) {
+      activeAssignmentId = id;
+      render();
+    }
+
+    // ---------- SUMMARY GENERATOR ----------
+    function generateSummary() {
+      const stats = getStats();
+      const activeClass = appData.classes.find(c => c.id === activeClassId);
+      const activeAsg = appData.assignments.find(a => a.id === activeAssignmentId);
+      if (!activeClass || !activeAsg) return '';
+
+      const pendingStr = stats.pendingSeats.length ? stats.pendingSeats.map(s=>`${s}號`).join('、') : '無';
+      const needFixStr = stats.needFixSeats.length ? stats.needFixSeats.map(s=>`${s}號`).join('、') : '無';
+
+      if (currentSummaryFormat === 'compact') {
+        return `【${activeClass.name}】${activeAsg.title}（${activeAsg.date}）\n未交：${pendingStr}；需訂正：${needFixStr}（全班 ${stats.total} 人，已交 ${stats.completed} 人）`;
+      } else if (currentSummaryFormat === 'pending-only') {
+        return `【${activeClass.name}】${activeAsg.title} - 未交名單\n座號：${pendingStr}（共 ${stats.pending} 人）`;
+      } else if (currentSummaryFormat === 'need-fix-only') {
+        return `【${activeClass.name}】${activeAsg.title} - 需訂正名單\n座號：${needFixStr}（共 ${stats.needFix} 人）`;
+      }
+
+      // Detailed
+      let text = `【${activeAsg.title} 作業繳交報告】\n班級：${activeClass.name}\n日期：${activeAsg.date}\n全班 ${stats.total} 人｜已交 ${stats.completed} 人｜未交 ${stats.pending} 人｜需訂正 ${stats.needFix} 人（完成率 ${stats.percent}%）\n\n`;
+      if (stats.pending === 0 && stats.needFix === 0) {
+        text += '🎉 全班同學均已繳交完成！';
+      } else {
+        text += `❌ 未交名單（${stats.pending}人）：${pendingStr}\n⚠️ 需訂正（${stats.needFix}人）：${needFixStr}\n✅ 已交：${stats.pendingSeats.length === 0 ? '全體同學已交' : '其餘同學已繳交'}`;
+      }
+      return text;
+    }
+
+    function openSummaryModal() {
+      const activeClass = appData.classes.find(c => c.id === activeClassId);
+      const activeAsg = appData.assignments.find(a => a.id === activeAssignmentId);
+      document.getElementById('summarySubtitle').innerText = `${activeClass?.name} · ${activeAsg?.title}`;
+      document.getElementById('summaryTextarea').value = generateSummary();
+      openModal('modalSummary');
+    }
+
+    // ---------- EVENT LISTENERS ----------
+    document.addEventListener('DOMContentLoaded', () => {
+      appData = loadData();
+      activeClassId = appData.classes[0]?.id || '';
+      activeAssignmentId = appData.assignments.find(a => a.classId === activeClassId)?.id || '';
+      render();
+
+      // Class Switcher
+      document.getElementById('classSelector').addEventListener('change', (e) => {
+        activeClassId = e.target.value;
+        const firstAsg = appData.assignments.find(a => a.classId === activeClassId && !a.isArchived);
+        activeAssignmentId = firstAsg ? firstAsg.id : '';
+        render();
+      });
+
+      // Filter Buttons
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => {
+            b.className = 'filter-btn px-2 py-1 rounded-md text-slate-600 hover:bg-slate-100';
+          });
+          btn.className = 'filter-btn px-2 py-1 rounded-md bg-slate-800 text-white font-medium';
+          currentFilter = btn.dataset.filter;
+          render();
+        });
+      });
+
+      // Undo button & Ctrl+Z
+      document.getElementById('btnUndo').addEventListener('click', undo);
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          undo();
+        }
+      });
+
+      // Batch buttons
+      document.getElementById('btnBatchComplete').addEventListener('click', () => {
+        const students = appData.students.filter(s => s.classId === activeClassId && s.isActive);
+        students.forEach(st => {
+          const ex = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === st.id);
+          if (ex) ex.status = 'completed';
+          else appData.statuses.push({ id: `${activeAssignmentId}_${st.id}`, assignmentId: activeAssignmentId, studentId: st.id, seatNumber: st.seatNumber, status: 'completed' });
+        });
+        saveData();
+        render();
+      });
+
+      document.getElementById('btnBatchReset').addEventListener('click', () => {
+        const students = appData.students.filter(s => s.classId === activeClassId && s.isActive);
+        students.forEach(st => {
+          const ex = appData.statuses.find(s => s.assignmentId === activeAssignmentId && s.studentId === st.id);
+          if (ex) ex.status = 'pending';
+          else appData.statuses.push({ id: `${activeAssignmentId}_${st.id}`, assignmentId: activeAssignmentId, studentId: st.id, seatNumber: st.seatNumber, status: 'pending' });
+        });
+        saveData();
+        render();
+      });
+
+      // Summary Modal Triggers & Formats
+      document.getElementById('btnOpenSummary').addEventListener('click', openSummaryModal);
+      document.querySelectorAll('.format-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.format-btn').forEach(b => {
+            b.className = 'format-btn px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50';
+          });
+          btn.className = 'format-btn px-2.5 py-1.5 rounded-lg border bg-blue-50 border-blue-600 text-blue-700 font-semibold';
+          currentSummaryFormat = btn.dataset.format;
+          document.getElementById('summaryTextarea').value = generateSummary();
+        });
+      });
+
+      document.getElementById('btnCopySummary').addEventListener('click', () => {
+        const text = document.getElementById('summaryTextarea').value;
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('✅ 已複製到剪貼簿！可直接貼至 LINE');
+        });
+      });
+
+      // Modals Open
+      document.getElementById('btnOpenBackup').addEventListener('click', () => openModal('modalBackup'));
+      document.getElementById('btnOpenFirebase').addEventListener('click', () => openModal('modalFirebase'));
+
+      // Class Management Modal
+      document.getElementById('btnOpenClassManage').addEventListener('click', () => {
+        const curr = appData.classes.find(c => c.id === activeClassId);
+        document.getElementById('inputClassName').value = curr ? curr.name : '';
+        renderRosterList();
+        openModal('modalClass');
+      });
+
+      document.getElementById('btnSaveClassName').addEventListener('click', () => {
+        const name = document.getElementById('inputClassName').value.trim();
+        if (!name) return;
+        const curr = appData.classes.find(c => c.id === activeClassId);
+        if (curr) {
+          curr.name = name;
+          saveData();
+          render();
+          showToast('班級名稱已儲存');
+        }
+      });
+
+      document.getElementById('btnAddSeat1').addEventListener('click', () => addSeats(1));
+      document.getElementById('btnAddSeat5').addEventListener('click', () => addSeats(5));
+
+      document.getElementById('formAddClass').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('newClassInputName').value.trim();
+        const count = parseInt(document.getElementById('newClassInputCount').value) || 30;
+        if (!name) return;
+        const newId = `class_${Date.now()}`;
+        const newClass = { id: newId, name, studentCount: count, createdAt: Date.now() };
+        const newStudents = [];
+        for (let i = 1; i <= count; i++) {
+          newStudents.push({ id: `student_${newId}_${i}`, classId: newId, seatNumber: i, name: '', isActive: true });
+        }
+        const newAsg = { id: `asg_${Date.now()}`, classId: newId, title: '第一份課堂作業', date: getTodayString(), isArchived: false };
+        appData.classes.push(newClass);
+        appData.students.push(...newStudents);
+        appData.assignments.push(newAsg);
+        activeClassId = newId;
+        activeAssignmentId = newAsg.id;
+        saveData();
+        render();
+        closeModal('modalClass');
+        showToast('已新增班級');
+      });
+
+      // Assignment modal
+      document.getElementById('btnNewAssignment').addEventListener('click', () => {
+        document.getElementById('editAssignmentId').value = '';
+        document.getElementById('inputAssignmentTitle').value = '';
+        document.getElementById('inputAssignmentDate').value = getTodayString();
+        document.getElementById('modalAssignmentTitle').innerText = '新增清點作業';
+        openModal('modalAssignment');
+      });
+
+      document.getElementById('btnEditAssignment').addEventListener('click', () => {
+        const asg = appData.assignments.find(a => a.id === activeAssignmentId);
+        if (!asg) return;
+        document.getElementById('editAssignmentId').value = asg.id;
+        document.getElementById('inputAssignmentTitle').value = asg.title;
+        document.getElementById('inputAssignmentDate').value = asg.date;
+        document.getElementById('modalAssignmentTitle').innerText = '編輯清點作業';
+        openModal('modalAssignment');
+      });
+
+      document.getElementById('btnDeleteAssignment').addEventListener('click', () => {
+        const asg = appData.assignments.find(a => a.id === activeAssignmentId);
+        if (!asg) return;
+        appData.assignments = appData.assignments.filter(a => a.id !== asg.id);
+        appData.statuses = appData.statuses.filter(s => s.assignmentId !== asg.id);
+        const next = appData.assignments.find(a => a.classId === activeClassId);
+        activeAssignmentId = next ? next.id : '';
+        saveData();
+        render();
+        showToast('作業已刪除');
+      });
+
+      document.getElementById('formAssignment').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editAssignmentId').value;
+        const title = document.getElementById('inputAssignmentTitle').value.trim();
+        const date = document.getElementById('inputAssignmentDate').value;
+        if (!title) return;
+
+        if (id) {
+          const asg = appData.assignments.find(a => a.id === id);
+          if (asg) { asg.title = title; asg.date = date; }
+        } else {
+          const newId = `asg_${Date.now()}`;
+          appData.assignments.unshift({ id: newId, classId: activeClassId, title, date, isArchived: false });
+          activeAssignmentId = newId;
+        }
+        saveData();
+        render();
+        closeModal('modalAssignment');
+        showToast('作業已儲存');
+      });
+
+      // Backup actions
+      document.getElementById('btnExportJSON').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `CheckHW_備份_${getTodayString()}.json`;
+        a.click();
+      });
+
+      document.getElementById('btnExportCSV').addEventListener('click', () => {
+        const activeClass = appData.classes.find(c => c.id === activeClassId);
+        const asg = appData.assignments.find(a => a.id === activeAssignmentId);
+        const students = appData.students.filter(s => s.classId === activeClassId && s.isActive).sort((a,b)=>a.seatNumber - b.seatNumber);
+        const statusMap = new Map();
+        appData.statuses.filter(s => s.assignmentId === activeAssignmentId).forEach(s => statusMap.set(s.studentId, s.status));
+
+        let csv = `\uFEFF班級,${activeClass.name}\n作業,${asg.title}\n日期,${asg.date}\n\n座號,姓名,狀態\n`;
+        const labels = { completed: '已交', pending: '未交', 'need-fix': '需訂正' };
+        students.forEach(st => {
+          const s = statusMap.get(st.id) || 'pending';
+          csv += `"${st.seatNumber}","${st.name || ''}","${labels[s] || '未交'}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${activeClass.name}_${asg.title}_名單.csv`;
+        a.click();
+      });
+
+      document.getElementById('fileImportJSON').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (data.classes && data.students && data.assignments && data.statuses) {
+              appData = data;
+              activeClassId = data.classes[0]?.id || '';
+              activeAssignmentId = data.assignments[0]?.id || '';
+              saveData();
+              render();
+              closeModal('modalBackup');
+              showToast('備份資料已成功匯入！');
+            } else {
+              showToast('檔案格式缺少必要欄位！');
+            }
+          } catch(err) {
+            showToast('無法解析檔案！');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('btnResetDemo').addEventListener('click', () => {
+        appData = generateInitialData();
+        activeClassId = appData.classes[0].id;
+        activeAssignmentId = appData.assignments[0].id;
+        saveData();
+        render();
+        closeModal('modalBackup');
+        showToast('已重設為初始示範資料');
+      });
+    });
+
+    function addSeats(count) {
+      const current = appData.students.filter(s => s.classId === activeClassId);
+      const maxSeat = current.reduce((m, s) => Math.max(m, s.seatNumber), 0);
+      for (let i = 1; i <= count; i++) {
+        const num = maxSeat + i;
+        appData.students.push({
+          id: `student_${activeClassId}_${num}_${Date.now()}`,
+          classId: activeClassId,
+          seatNumber: num,
+          name: '',
+          isActive: true
+        });
+      }
+      saveData();
+      render();
+      renderRosterList();
+    }
+
+    function toggleStudentActive(id) {
+      const student = appData.students.find(s => s.id === id);
+      if (student) {
+        student.isActive = !student.isActive;
+        saveData();
+        render();
+        renderRosterList();
+      }
+    }
+
+    function updateStudentName(id, val) {
+      const student = appData.students.find(s => s.id === id);
+      if (student) {
+        student.name = val.trim();
+        saveData();
+        render();
+      }
+    }
+
+    function deleteSeat(studentId) {
+      const student = appData.students.find(s => s.id === studentId);
+      if (!student) return;
+      appData.students = appData.students.filter(s => s.id !== studentId);
+      appData.statuses = appData.statuses.filter(st => st.studentId !== studentId);
+      const currClass = appData.classes.find(c => c.id === activeClassId);
+      if (currClass) currClass.studentCount = appData.students.filter(s => s.classId === activeClassId && s.isActive).length;
+      saveData();
+      render();
+      renderRosterList();
+      showToast(`已成功刪除座號：${student.seatNumber} 號`);
+    }
+
+    function trimSeats(presetCount) {
+      let targetCount = presetCount || parseInt(document.getElementById('inputTrimCount').value, 10);
+      const current = appData.students.filter(s => s.classId === activeClassId).sort((a,b)=>a.seatNumber - b.seatNumber);
+      if (!targetCount || targetCount <= 0) {
+        showToast('請輸入有效的班級人數');
+        return;
+      }
+      if (targetCount < current.length) {
+        const keepIds = new Set(current.slice(0, targetCount).map(s => s.id));
+        appData.students = appData.students.filter(s => s.classId !== activeClassId || keepIds.has(s.id));
+        appData.statuses = appData.statuses.filter(st => {
+          const asg = appData.assignments.find(a => a.id === st.assignmentId);
+          return !(asg && asg.classId === activeClassId && !keepIds.has(st.studentId));
+        });
+      } else if (targetCount > current.length) {
+        const maxSeat = current.reduce((max, s) => Math.max(max, s.seatNumber), 0);
+        for (let i = 1; i <= targetCount - current.length; i++) {
+          appData.students.push({
+            id: `student_${activeClassId}_${maxSeat + i}_${Date.now()}_${i}`,
+            classId: activeClassId,
+            seatNumber: maxSeat + i,
+            name: '',
+            isActive: true,
+          });
+        }
+      }
+      const currClass = appData.classes.find(c => c.id === activeClassId);
+      if (currClass) currClass.studentCount = appData.students.filter(s => s.classId === activeClassId && s.isActive).length;
+      saveData();
+      render();
+      renderRosterList();
+      showToast(`已成功設定全班人數為 ${targetCount} 人！`);
+    }
+
+    function applyImportRoster() {
+      const text = document.getElementById('importRosterTextarea').value.trim();
+      if (!text) return;
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) return;
+
+      const newStudents = [];
+      lines.forEach((line, idx) => {
+        let seatNum = idx + 1;
+        let name = line;
+        const match = line.match(/^(\d+)[\s.,、\t,]+(.+)$/);
+        if (match) {
+          seatNum = parseInt(match[1], 10);
+          name = match[2].trim();
+        }
+        newStudents.push({
+          id: `student_${activeClassId}_${seatNum}_${Date.now()}_${idx}`,
+          classId: activeClassId,
+          seatNumber: seatNum,
+          name: name,
+          isActive: true
+        });
+      });
+
+      // Replace students for this class
+      appData.students = appData.students.filter(s => s.classId !== activeClassId).concat(newStudents);
+      const currClass = appData.classes.find(c => c.id === activeClassId);
+      if (currClass) currClass.studentCount = newStudents.length;
+
+      saveData();
+      render();
+      closeModal('modalImportRoster');
+      renderRosterList();
+      showToast(`已成功匯入 ${newStudents.length} 名學生名單！`);
+    }
+
+    function renderRosterList() {
+      const current = appData.students
+        .filter(s => s.classId === activeClassId)
+        .sort((a,b)=>a.seatNumber - b.seatNumber);
+
+      document.getElementById('inputTrimCount').value = current.length || 30;
+
+      document.getElementById('classRosterList').innerHTML = current.map(st => `
+        <div class="p-2 flex items-center justify-between gap-2 text-xs ${st.isActive ? 'bg-white':'bg-slate-100 opacity-60'}">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 bg-slate-100 border border-slate-200 rounded font-bold flex items-center justify-center shrink-0">${st.seatNumber}</span>
+            <input type="text" placeholder="姓名 (選填)" value="${st.name || ''}" onchange="updateStudentName('${st.id}', this.value)"
+              class="px-2 py-1 text-xs border border-slate-200 rounded w-32 sm:w-36 bg-white focus:outline-hidden" />
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="toggleStudentActive('${st.id}')" class="px-2 py-1 rounded text-[11px] font-medium ${
+              st.isActive ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-amber-700 bg-amber-50 border border-amber-200'
+            }">
+              ${st.isActive ? '正常' : '缺號'}
+            </button>
+            <button onclick="deleteSeat('${st.id}')" title="刪除此座號" class="px-2 py-0.5 text-xs font-bold text-rose-600 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 rounded flex items-center gap-1 transition-colors">
+              🗑️ 刪除
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
