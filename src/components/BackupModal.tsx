@@ -18,7 +18,7 @@ interface BackupModalProps {
   isOpen: boolean;
   onClose: () => void;
   appData: AppData;
-  activeClass: ClassRecord;
+  activeClass?: ClassRecord;
   activeAssignment?: AssignmentRecord;
   onImportData: (data: AppData) => void;
   onResetData: () => void;
@@ -59,7 +59,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
 
   // CSV Export
   const handleExportCSV = () => {
-    if (!activeAssignment) return;
+    if (!activeClass || !activeAssignment) return;
     const csvContent = exportAssignmentCSV(
       activeClass,
       activeAssignment,
@@ -183,7 +183,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
           </div>
 
           {/* Action 2: Export CSV for Excel */}
-          {activeAssignment && (
+          {activeClass && activeAssignment && (
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold text-slate-800 text-sm">

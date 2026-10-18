@@ -80,7 +80,116 @@ export const ClassManageModal: React.FC<ClassManageModalProps> = ({
     }
   }, [activeClassId, activeClass, students]);
 
-  if (!isOpen || !activeClass) return null;
+  const handleCreateNewClassSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassName.trim()) return;
+    onAddClass(newClassName.trim(), Number(newClassCount) || 30);
+    setNewClassName('');
+    setIsCreatingNew(false);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  // If there are no classes yet (clean state), show the streamlined New Class creation form directly!
+  if (!activeClass) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
+          {/* Modal Header */}
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <span>手動建立新班級</span>
+              </h2>
+              <p className="text-xs text-slate-500">
+                輸入班級名稱與全班人數，立即產生作業清點網格
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="關閉"
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleCreateNewClassSubmit} className="p-4 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                班級名稱 <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="例如：七年 6 班、706、八年 3 班"
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-hidden font-medium"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                全班人數 (座號數) <span className="text-rose-500">*</span>
+              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  required
+                  placeholder="如 28 或 30"
+                  value={newClassCount}
+                  onChange={(e) => setNewClassCount(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-hidden font-bold text-slate-800"
+                />
+                <span className="text-xs text-slate-500 shrink-0 font-medium">人</span>
+              </div>
+
+              {/* Quick preset chips */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-slate-400 mr-1">常用人數：</span>
+                {[20, 24, 25, 28, 30, 32, 35].map((cnt) => (
+                  <button
+                    key={cnt}
+                    type="button"
+                    onClick={() => setNewClassCount(cnt)}
+                    className={`px-2.5 py-1 text-xs rounded-lg border font-bold transition-all cursor-pointer ${
+                      newClassCount === cnt
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {cnt} 人
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                立即建立並開始使用
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const showNotice = (msg: string) => {
     setNoticeMessage(msg);
@@ -245,14 +354,6 @@ export const ClassManageModal: React.FC<ClassManageModalProps> = ({
     setLocalStudents(imported);
     onUpdateStudents(activeClass.id, imported);
     showNotice(`名單匯入成功！已更新為 ${imported.length} 位學生`);
-  };
-
-  const handleCreateNewClassSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newClassName.trim()) return;
-    onAddClass(newClassName.trim(), Number(newClassCount) || 30);
-    setNewClassName('');
-    setIsCreatingNew(false);
   };
 
   return (

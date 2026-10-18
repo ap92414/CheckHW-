@@ -855,21 +855,19 @@ export default function App() {
         />
       )}
 
-      {activeClass && (
-        <ClassManageModal
-          isOpen={isClassManageOpen}
-          onClose={() => setIsClassManageOpen(false)}
-          classes={appData.classes}
-          activeClassId={activeClass.id}
-          students={appData.students}
-          onAddClass={handleAddClass}
-          onUpdateClass={handleUpdateClass}
-          onDeleteClass={handleDeleteClass}
-          onUpdateStudents={handleUpdateStudents}
-          onDeleteStudent={handleDeleteStudent}
-          onSetClassCount={handleSetClassCount}
-        />
-      )}
+      <ClassManageModal
+        isOpen={isClassManageOpen}
+        onClose={() => setIsClassManageOpen(false)}
+        classes={appData.classes}
+        activeClassId={activeClass?.id || ''}
+        students={appData.students}
+        onAddClass={handleAddClass}
+        onUpdateClass={handleUpdateClass}
+        onDeleteClass={handleDeleteClass}
+        onUpdateStudents={handleUpdateStudents}
+        onDeleteStudent={handleDeleteStudent}
+        onSetClassCount={handleSetClassCount}
+      />
 
       <AssignmentModal
         isOpen={isAssignmentModalOpen}
@@ -878,33 +876,31 @@ export default function App() {
         onSaveAssignment={handleSaveAssignment}
       />
 
-      {activeClass && (
-        <BackupModal
-          isOpen={isBackupOpen}
-          onClose={() => setIsBackupOpen(false)}
-          appData={appData}
-          activeClass={activeClass}
-          activeAssignment={activeAssignment}
-          onImportData={async (data) => {
-            updateAppDataAndSave(data);
-            setActiveClassId(data.classes[0]?.id || '');
-            setActiveAssignmentId(data.assignments[0]?.id || '');
-            try {
-              const user = auth.currentUser || (await ensureTeacherAuth());
-              if (user) {
-                await uploadAppDataToCloud(user.uid, data);
-              }
-              if (roomCode) {
-                await uploadRoomData(roomCode, data);
-              }
-            } catch (err) {
-              console.warn('Sync imported data to cloud/room notice:', err);
+      <BackupModal
+        isOpen={isBackupOpen}
+        onClose={() => setIsBackupOpen(false)}
+        appData={appData}
+        activeClass={activeClass}
+        activeAssignment={activeAssignment}
+        onImportData={async (data) => {
+          updateAppDataAndSave(data);
+          setActiveClassId(data.classes[0]?.id || '');
+          setActiveAssignmentId(data.assignments[0]?.id || '');
+          try {
+            const user = auth.currentUser || (await ensureTeacherAuth());
+            if (user) {
+              await uploadAppDataToCloud(user.uid, data);
             }
-          }}
-          onResetData={handleResetData}
-          onDownloadStandaloneHtml={handleDownloadStandaloneHtml}
-        />
-      )}
+            if (roomCode) {
+              await uploadRoomData(roomCode, data);
+            }
+          } catch (err) {
+            console.warn('Sync imported data to cloud/room notice:', err);
+          }
+        }}
+        onResetData={handleResetData}
+        onDownloadStandaloneHtml={handleDownloadStandaloneHtml}
+      />
 
       <FirebaseModal
         isOpen={isFirebaseOpen}
