@@ -62,11 +62,15 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onSelectClass(e.target.value)}
                 className="appearance-none bg-transparent pl-2.5 pr-7 py-1 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-hidden cursor-pointer"
               >
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name} ({cls.studentCount}人)
-                  </option>
-                ))}
+                {classes.length === 0 ? (
+                  <option value="">無班級資料</option>
+                ) : (
+                  classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name} ({cls.studentCount}人)
+                    </option>
+                  ))
+                )}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500 -ml-5 pointer-events-none shrink-0" />
             </div>

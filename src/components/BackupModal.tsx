@@ -251,12 +251,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
             </div>
           )}
 
-          {/* Action 5: Reset Demo Data */}
+          {/* Action 5: Reset to clean empty state */}
           <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-            <span className="text-slate-400">想重新體驗初始狀態？</span>
+            <span className="text-slate-400">想完全清空目前資料？</span>
             {isConfirmingReset ? (
               <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-300 rounded-lg p-1.5 animate-in fade-in">
-                <span className="text-rose-700 font-bold text-xs">確定重設？</span>
+                <span className="text-rose-700 font-bold text-xs">確定全部清空？</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -265,7 +265,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                   }}
                   className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-xs transition-colors cursor-pointer"
                 >
-                  確認重設
+                  確認清空
                 </button>
                 <button
                   type="button"
@@ -282,7 +282,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 className="text-rose-600 hover:text-rose-700 flex items-center gap-1 font-semibold text-xs cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                重設回初始範例資料
+                清空為乾淨空白狀態（不留範本）
               </button>
             )}
           </div>

@@ -29,6 +29,7 @@ import {
   setStoredRoomCode
 } from '../utils/firebase';
 import { AppData } from '../types';
+import { generateCleanEmptyData } from '../utils/storage';
 
 interface FirebaseModalProps {
   isOpen: boolean;
@@ -117,11 +118,13 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
     }
   };
 
-  // Disconnect from room
+  // Disconnect from room and clear local data cleanly (不留範本)
   const handleLeaveRoom = () => {
     setStoredRoomCode('');
     onUpdateRoomCode('');
-    setSyncMessage('已退出教室代碼同步，回到純本機模式');
+    const cleanEmpty = generateCleanEmptyData();
+    onSyncDataFromCloud(cleanEmpty);
+    setSyncMessage('已退出教室代碼！本地資料庫已全數清空，未保留任何範本。');
   };
 
   if (!isOpen) return null;

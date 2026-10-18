@@ -4,6 +4,7 @@ import {
   saveAppData, 
   getNextStatus, 
   generateInitialData,
+  generateCleanEmptyData,
   getTodayDateString 
 } from './utils/storage';
 import { 
@@ -702,12 +703,12 @@ export default function App() {
     });
   };
 
-  // Reset to initial demo data
+  // Reset to clean empty data (不留任何範本)
   const handleResetData = () => {
-    const initial = generateInitialData();
-    updateAppDataAndSave(initial);
-    setActiveClassId(initial.classes[0].id);
-    setActiveAssignmentId(initial.assignments[0].id);
+    const cleanEmpty = generateCleanEmptyData();
+    updateAppDataAndSave(cleanEmpty);
+    setActiveClassId('');
+    setActiveAssignmentId('');
     setUndoStack([]);
   };
 
@@ -773,7 +774,34 @@ export default function App() {
 
       {/* 3. Core Seat Number Grid (Thumb-friendly & responsive) */}
       <main className="flex-1">
-        {activeAssignment ? (
+        {appData.classes.length === 0 ? (
+          <div className="max-w-md mx-auto text-center py-16 px-4 space-y-4">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-3xl shadow-xs border border-blue-100">
+              🏫
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800 mb-1">已退出教室，目前為乾淨空白狀態</h2>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                本機資料庫已全數清空，未保留任何班級、學生與作業範本。<br />
+                請點擊下方輸入教室代碼連線，或手動建立新班級開始清點。
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => setIsFirebaseOpen(true)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs flex items-center justify-center gap-2 text-xs transition-colors"
+              >
+                <span>🔑 輸入教室代碼連線</span>
+              </button>
+              <button
+                onClick={() => setIsClassManageOpen(true)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 text-xs transition-colors"
+              >
+                <span>➕ 手動建立新班級</span>
+              </button>
+            </div>
+          </div>
+        ) : activeAssignment ? (
           <StudentGrid
             students={classStudents}
             statuses={appData.statuses}

@@ -156,3 +156,15 @@ export function validateImportData(obj: unknown): { valid: boolean; error?: stri
     },
   };
 }
+
+// Generate completely clean empty data (no sample classes or templates)
+export function generateCleanEmptyData(): AppData {
+  return {
+    version: 1,
+    classes: [],
+    students: [],
+    assignments: [],
+    statuses: [],
+  };
+}
+
