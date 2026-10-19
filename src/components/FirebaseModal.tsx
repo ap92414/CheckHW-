@@ -38,6 +38,8 @@ interface FirebaseModalProps {
   onSyncDataFromCloud: (partial: Partial<AppData>) => void;
   roomCode: string;
   onUpdateRoomCode: (code: string) => void;
+  isTeacherUnlocked?: boolean;
+  onOpenPasswordModal?: () => void;
 }
 
 export const FirebaseModal: React.FC<FirebaseModalProps> = ({ 
@@ -46,7 +48,9 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
   appData,
   onSyncDataFromCloud,
   roomCode,
-  onUpdateRoomCode
+  onUpdateRoomCode,
+  isTeacherUnlocked = false,
+  onOpenPasswordModal
 }) => {
   const [activeTab, setActiveTab] = useState<'room' | 'sync' | 'rules'>('room');
   const [inputRoomCode, setInputRoomCode] = useState<string>(roomCode || getStoredRoomCode() || '706');
@@ -73,6 +77,12 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
 
   // 1. Phone / Primary PC: Upload current local 706 data to this Room Code
   const handleUploadToRoom = async () => {
+    if (!isTeacherUnlocked) {
+      if (onOpenPasswordModal) onOpenPasswordModal();
+      setSyncMessage('⚠️ 重新綁定/覆蓋雲端班級名單需要教師權限，請先輸入密碼解鎖！');
+      return;
+    }
+
     const code = inputRoomCode.trim();
     if (!code) {
       setSyncMessage('請先輸入教室代碼（例如：706）');
@@ -120,6 +130,11 @@ export const FirebaseModal: React.FC<FirebaseModalProps> = ({
 
   // Disconnect from room and clear local data cleanly (不留範本)
   const handleLeaveRoom = () => {
+    if (!isTeacherUnlocked) {
+      if (onOpenPasswordModal) onOpenPasswordModal();
+      setSyncMessage('⚠️ 退出教室與抹除本機資料需要教師權限，請先輸入密碼解鎖！');
+      return;
+    }
     setStoredRoomCode('');
     onUpdateRoomCode('');
     const cleanEmpty = generateCleanEmptyData();

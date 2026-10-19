@@ -212,6 +212,8 @@ export async function updateCloudStatus(
 // ==========================================
 
 export const ROOM_CODE_STORAGE_KEY = 'checkhw_classroom_room_code';
+export const ROOM_PASSWORD_STORAGE_KEY = 'checkhw_teacher_room_password';
+export const TEACHER_UNLOCKED_STORAGE_KEY = 'checkhw_teacher_unlocked';
 
 export function getStoredRoomCode(): string {
   return localStorage.getItem(ROOM_CODE_STORAGE_KEY) || '';
@@ -226,16 +228,40 @@ export function setStoredRoomCode(code: string): void {
   }
 }
 
+export function getStoredTeacherPassword(): string {
+  return localStorage.getItem(ROOM_PASSWORD_STORAGE_KEY) || '8888';
+}
+
+export function setStoredTeacherPassword(pass: string): void {
+  localStorage.setItem(ROOM_PASSWORD_STORAGE_KEY, pass.trim() || '8888');
+}
+
+export function getIsTeacherUnlocked(): boolean {
+  return sessionStorage.getItem(TEACHER_UNLOCKED_STORAGE_KEY) === 'true';
+}
+
+export function setIsTeacherUnlocked(unlocked: boolean): void {
+  if (unlocked) {
+    sessionStorage.setItem(TEACHER_UNLOCKED_STORAGE_KEY, 'true');
+  } else {
+    sessionStorage.removeItem(TEACHER_UNLOCKED_STORAGE_KEY);
+  }
+}
+
 // Upload/push full AppData into a Classroom Room
-export async function uploadRoomData(roomCode: string, data: AppData): Promise<void> {
+export async function uploadRoomData(roomCode: string, data: AppData, password?: string): Promise<void> {
   const cleanCode = roomCode.trim();
   if (!cleanCode) throw new Error('請輸入有效的教室代碼');
 
   const roomRef = doc(db, 'syncRooms', cleanCode);
-  await setDoc(roomRef, {
+  const payload: Record<string, unknown> = {
     data,
     updatedAt: Date.now(),
-  }, { merge: true });
+  };
+  if (password) {
+    payload.password = password;
+  }
+  await setDoc(roomRef, payload, { merge: true });
 
   // Also push individual statuses for fast sub-millisecond atomic updates
   const batch = writeBatch(db);
@@ -249,7 +275,7 @@ export async function uploadRoomData(roomCode: string, data: AppData): Promise<v
 // Subscribe to a Classroom Room (both full dataset & real-time statuses)
 export function subscribeToRoom(
   roomCode: string,
-  onDataUpdate: (data: Partial<AppData>) => void,
+  onDataUpdate: (data: Partial<AppData>, roomPassword?: string) => void,
   onError?: (err: Error) => void
 ): () => void {
   const cleanCode = roomCode.trim();
@@ -267,7 +293,10 @@ export function subscribeToRoom(
           const newTime = Number(val.updatedAt) || 0;
           if (newTime >= lastKnownTimestamp) {
             lastKnownTimestamp = newTime;
-            onDataUpdate(val.data as AppData);
+            if (val.password) {
+              setStoredTeacherPassword(val.password);
+            }
+            onDataUpdate(val.data as AppData, val.password);
           }
         }
       }

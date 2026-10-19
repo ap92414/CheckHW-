@@ -21,6 +21,7 @@ interface AssignmentBarProps {
   onDeleteAssignment: (id: string) => void;
   onToggleArchive: (id: string) => void;
   onBatchSetStatus: (status: 'completed' | 'pending') => void;
+  isTeacherUnlocked?: boolean;
 }
 
 export const AssignmentBar: React.FC<AssignmentBarProps> = ({
@@ -32,6 +33,7 @@ export const AssignmentBar: React.FC<AssignmentBarProps> = ({
   onDeleteAssignment,
   onToggleArchive,
   onBatchSetStatus,
+  isTeacherUnlocked = false,
 }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,51 +139,55 @@ export const AssignmentBar: React.FC<AssignmentBarProps> = ({
                         <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
                         一鍵全班重設未交
                       </button>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          onToggleArchive(currentAssignment.id);
-                        }}
-                        className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <Archive className="w-3.5 h-3.5 text-slate-500" />
-                        {currentAssignment.isArchived ? '解除封存作業' : '封存此作業'}
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                      {isConfirmingDelete ? (
-                        <div className="p-2 bg-rose-50 border border-rose-200 rounded mx-1 text-center">
-                          <p className="text-[11px] font-bold text-rose-800 mb-1.5">確定刪除此作業？</p>
-                          <div className="flex items-center justify-center gap-1.5">
+                      {isTeacherUnlocked && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onToggleArchive(currentAssignment.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                          >
+                            <Archive className="w-3.5 h-3.5 text-slate-500" />
+                            {currentAssignment.isArchived ? '解除封存作業' : '封存此作業'}
+                          </button>
+                          <div className="border-t border-slate-100 my-1" />
+                          {isConfirmingDelete ? (
+                            <div className="p-2 bg-rose-50 border border-rose-200 rounded mx-1 text-center">
+                              <p className="text-[11px] font-bold text-rose-800 mb-1.5">確定刪除此作業？</p>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsConfirmingDelete(false);
+                                    setMenuOpen(false);
+                                    onDeleteAssignment(currentAssignment.id);
+                                  }}
+                                  className="px-2 py-0.5 bg-rose-600 text-white rounded text-xs font-bold hover:bg-rose-700 cursor-pointer"
+                                >
+                                  確認刪除
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsConfirmingDelete(false)}
+                                  className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs cursor-pointer"
+                                >
+                                  取消
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
                             <button
-                              type="button"
                               onClick={() => {
-                                setIsConfirmingDelete(false);
-                                setMenuOpen(false);
-                                onDeleteAssignment(currentAssignment.id);
+                                setIsConfirmingDelete(true);
                               }}
-                              className="px-2 py-0.5 bg-rose-600 text-white rounded text-xs font-bold hover:bg-rose-700 cursor-pointer"
+                              className="w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
                             >
-                              確認刪除
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                              刪除此作業
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setIsConfirmingDelete(false)}
-                              className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs cursor-pointer"
-                            >
-                              取消
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setIsConfirmingDelete(true);
-                          }}
-                          className="w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                          刪除此作業
-                        </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </>

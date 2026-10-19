@@ -27,6 +27,7 @@ import { AssignmentModal } from './components/AssignmentModal';
 import { BackupModal } from './components/BackupModal';
 import { FirebaseModal } from './components/FirebaseModal';
 import { DevLogModal } from './components/DevLogModal';
+import { TeacherPasswordModal } from './components/TeacherPasswordModal';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { 
   auth, 
@@ -38,12 +39,15 @@ import {
   setStoredRoomCode,
   subscribeToRoom,
   updateRoomStatus,
-  uploadRoomData
+  uploadRoomData,
+  getIsTeacherUnlocked
 } from './utils/firebase';
 
 export default function App() {
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [roomCode, setRoomCode] = useState<string>(() => getStoredRoomCode());
+  const [isTeacherUnlocked, setIsTeacherUnlockedState] = useState<boolean>(() => getIsTeacherUnlocked());
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [activeClassId, setActiveClassId] = useState<string>(() => {
     const data = loadAppData();
     return data.classes[0]?.id || '';
@@ -194,10 +198,16 @@ export default function App() {
     return calculateStats(classStudents, appData.statuses, activeAssignment.id);
   }, [classStudents, appData.statuses, activeAssignment]);
 
-  // Persist appData whenever it changes
+  // Persist appData whenever it changes and sync to connected room
   const updateAppDataAndSave = useCallback((newData: AppData) => {
     setAppData(newData);
     saveAppData(newData);
+    const code = getStoredRoomCode();
+    if (code) {
+      uploadRoomData(code, newData).catch((err) => {
+        console.warn('Room auto-sync notice:', err);
+      });
+    }
   }, []);
 
   // Cycle student status: pending -> completed -> need-fix -> pending
@@ -461,10 +471,16 @@ export default function App() {
 
     if (id) {
       // Edit
-      const updated = appData.assignments.map((a) =>
+      const updatedAsgs = appData.assignments.map((a) =>
         a.id === id ? { ...a, title, date } : a
       );
-      updateAppDataAndSave({ ...appData, assignments: updated });
+      const updatedData: AppData = { ...appData, assignments: updatedAsgs };
+      updateAppDataAndSave(updatedData);
+      if (roomCode) {
+        uploadRoomData(roomCode, updatedData).catch((err) => {
+          console.warn('Sync edit assignment to room error:', err);
+        });
+      }
     } else {
       // Create new
       const newAsg: AssignmentRecord = {
@@ -485,21 +501,35 @@ export default function App() {
         updatedAt: Date.now(),
       }));
 
-      updateAppDataAndSave({
+      const updatedData: AppData = {
         ...appData,
         assignments: [newAsg, ...appData.assignments],
         statuses: [...appData.statuses, ...newStatuses],
-      });
+      };
+
+      updateAppDataAndSave(updatedData);
       setActiveAssignmentId(newAsg.id);
+
+      if (roomCode) {
+        uploadRoomData(roomCode, updatedData).catch((err) => {
+          console.warn('Sync new assignment to room error:', err);
+        });
+      }
     }
   };
 
   // Toggle archive assignment
   const handleToggleArchiveAssignment = (asgId: string) => {
-    const updated = appData.assignments.map((a) =>
+    const updatedAsgs = appData.assignments.map((a) =>
       a.id === asgId ? { ...a, isArchived: !a.isArchived } : a
     );
-    updateAppDataAndSave({ ...appData, assignments: updated });
+    const updatedData: AppData = { ...appData, assignments: updatedAsgs };
+    updateAppDataAndSave(updatedData);
+    if (roomCode) {
+      uploadRoomData(roomCode, updatedData).catch((err) => {
+        console.warn('Sync archive assignment to room error:', err);
+      });
+    }
   };
 
   // Delete assignment (direct delete without window.confirm to prevent iframe suppression)
@@ -510,11 +540,19 @@ export default function App() {
     const remainingAsgs = appData.assignments.filter((a) => a.id !== asgId);
     const remainingStatuses = appData.statuses.filter((st) => st.assignmentId !== asgId);
 
-    updateAppDataAndSave({
+    const updatedData: AppData = {
       ...appData,
       assignments: remainingAsgs,
       statuses: remainingStatuses,
-    });
+    };
+
+    updateAppDataAndSave(updatedData);
+
+    if (roomCode) {
+      uploadRoomData(roomCode, updatedData).catch((err) => {
+        console.warn('Sync delete assignment to room error:', err);
+      });
+    }
 
     const nextActive = remainingAsgs.find((a) => a.classId === activeClassId && !a.isArchived);
     setActiveAssignmentId(nextActive?.id || remainingAsgs[0]?.id || '');
@@ -752,6 +790,8 @@ export default function App() {
         onUndo={handleUndo}
         isCloudSyncActive={isCloudSyncActive}
         roomCode={roomCode}
+        isTeacherUnlocked={isTeacherUnlocked}
+        onOpenPasswordModal={() => setIsPasswordModalOpen(true)}
       />
 
       {/* 2. Assignment Management Bar */}
@@ -770,6 +810,7 @@ export default function App() {
         onDeleteAssignment={handleDeleteAssignment}
         onToggleArchive={handleToggleArchiveAssignment}
         onBatchSetStatus={handleBatchSetStatus}
+        isTeacherUnlocked={isTeacherUnlocked}
       />
 
       {/* 3. Core Seat Number Grid (Thumb-friendly & responsive) */}
@@ -919,11 +960,22 @@ export default function App() {
         }}
         roomCode={roomCode}
         onUpdateRoomCode={(code) => setRoomCode(code)}
+        isTeacherUnlocked={isTeacherUnlocked}
+        onOpenPasswordModal={() => setIsPasswordModalOpen(true)}
       />
 
       <DevLogModal
         isOpen={isDevLogOpen}
         onClose={() => setIsDevLogOpen(false)}
+      />
+
+      <TeacherPasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        isUnlocked={isTeacherUnlocked}
+        onUnlockSuccess={() => setIsTeacherUnlockedState(true)}
+        onLockSuccess={() => setIsTeacherUnlockedState(false)}
+        appData={appData}
       />
     </div>
   );

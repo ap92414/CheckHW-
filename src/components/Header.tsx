@@ -7,7 +7,11 @@ import {
   Settings, 
   Plus, 
   ChevronDown,
-  BookOpen
+  BookOpen,
+  Lock,
+  Unlock,
+  Crown,
+  ShieldAlert
 } from 'lucide-react';
 import { ClassRecord } from '../types';
 
@@ -23,6 +27,8 @@ interface HeaderProps {
   onUndo: () => void;
   isCloudSyncActive?: boolean;
   roomCode?: string;
+  isTeacherUnlocked: boolean;
+  onOpenPasswordModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,6 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
   onUndo,
   isCloudSyncActive = false,
   roomCode = '',
+  isTeacherUnlocked,
+  onOpenPasswordModal,
 }) => {
   const activeClass = classes.find((c) => c.id === activeClassId);
 
@@ -76,19 +84,22 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onOpenClassManage}
-            title="班級與學生座號名單設定"
-            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
-          >
-            <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">名單設定</span>
-          </button>
+          {/* Teacher Mode: 名單設定 (Only visible for teacher admin) */}
+          {isTeacherUnlocked && (
+            <button
+              onClick={onOpenClassManage}
+              title="班級與學生座號名單設定"
+              className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">名單設定</span>
+            </button>
+          )}
         </div>
 
         {/* Right Action Tools */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Undo Button */}
+          {/* Undo Button (Available in both modes for easy misclick recovery) */}
           <button
             onClick={onUndo}
             disabled={!canUndo}
@@ -103,30 +114,34 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">復原點擊</span>
           </button>
 
-          {/* Backup / Export */}
-          <button
-            onClick={onOpenBackup}
-            title="資料備份與匯出 (JSON / CSV)"
-            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-          >
-            <Database className="w-4 h-4" />
-          </button>
+          {/* Teacher Only: Backup / Export */}
+          {isTeacherUnlocked && (
+            <button
+              onClick={onOpenBackup}
+              title="資料備份與匯出 (JSON / CSV)"
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+            >
+              <Database className="w-4 h-4" />
+            </button>
+          )}
 
-          {/* Development Log Button */}
-          <button
-            onClick={onOpenDevLog}
-            title="查看完整研發日誌 (Changelog)"
-            className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-slate-200 transition-colors flex items-center gap-1 text-xs font-semibold"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">研發日誌</span>
-          </button>
+          {/* Teacher Only: Development Log */}
+          {isTeacherUnlocked && (
+            <button
+              onClick={onOpenDevLog}
+              title="查看完整研發日誌 (Changelog)"
+              className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-slate-200 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">研發日誌</span>
+            </button>
+          )}
 
           {/* Firebase / Classroom Room Code Status Badge */}
           <button
             onClick={onOpenFirebase}
             title={roomCode ? `已連線教室【${roomCode}】（點擊管理）` : '點擊設定教室配對碼（手機⇋大螢幕即時同步）'}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
               roomCode 
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
@@ -139,8 +154,31 @@ export const Header: React.FC<HeaderProps> = ({
             <span className={`text-[10px] px-1 rounded-sm border ${
               roomCode ? 'bg-white text-emerald-700 border-emerald-200 font-bold' : 'bg-white text-slate-500 border-slate-200'
             }`}>
-              {roomCode ? '即時同步' : '未連線'}
+              {roomCode ? '即時' : '未連線'}
             </span>
+          </button>
+
+          {/* Teacher Permission Unlock/Lock Button */}
+          <button
+            onClick={onOpenPasswordModal}
+            title={isTeacherUnlocked ? '點擊鎖定為大螢幕/小老師安全模式' : '點擊輸入密碼解鎖教師管理權限'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+              isTeacherUnlocked
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300'
+            }`}
+          >
+            {isTeacherUnlocked ? (
+              <>
+                <Crown className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">教師權限</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden sm:inline">解鎖權限</span>
+              </>
+            )}
           </button>
         </div>
       </div>
