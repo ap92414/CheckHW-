@@ -74,15 +74,183 @@ export const DevLogModal: React.FC<DevLogModalProps> = ({ isOpen, onClose }) => 
         <div className="p-4 flex-1 overflow-y-auto text-xs space-y-4">
           {activeTab === 'versions' && (
             <div className="space-y-4">
-              {/* v1.2.1 */}
-              <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50/40 space-y-2">
+              {/* v1.8.6 */}
+              <div className="p-3.5 rounded-xl border border-emerald-400 bg-emerald-50/50 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-rose-950 text-sm">
-                    v1.2.1 (關鍵修復：座號刪除直覺化、徹底移除阻塞式彈窗、班級人數一鍵裁切)
+                  <span className="font-bold text-emerald-950 text-sm">
+                    v1.8.6 (黑板直式板書排版 100% 依實圖校正：徹底解決座號橫向排開問題，完美還原圖一垂直板書與冒號對齊續行)
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded-full font-bold">
+                  <span className="text-[10px] px-2 py-0.5 bg-emerald-600 text-white rounded-full font-bold">
                     最新版本
                   </span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>📷 100% 精準對照圖一實作：</strong> 徹底解決先前因 Flex 佈局方向衝突導致座號橫向排開的問題（圖二），全面回歸原生垂直書寫流。</li>
+                  <li><strong>⬇️ 直式垂直板書書寫：</strong> 標題、冒號、座號（縱中橫排）與頓號由上至下垂直排成一行，工整美觀。</li>
+                  <li><strong>📏 圖一續行冒號對齊懸掛：</strong> 座號換行時，第二行頂部設置與標題等長的隱形 Spacer，第二行第一個座號直接從冒號左側接續、完全對齊冒號後第一個數字！</li>
+                  <li><strong>。 句號完美結尾：</strong> 全部座號完成後，最後結尾必定以全形中文句號「。」作結。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.5 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.5 (排版與換行懸掛縮排全面優化)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🎨 恢復原版流暢字體：</strong> 依使用者回饋撤回實驗性幾何標點，恢復最清晰美觀的原生系統字體系統，維持純座號清爽呈現。</li>
+                  <li><strong>⬆️ 隱藏工具列黑板文字自動上移：</strong> 修正工具列折疊時仍占位的問題，收起工具列後文字平滑上移，去除上方多餘突兀留白。</li>
+                  <li><strong>📐 黑板預留充裕安全邊界：</strong> 底部預留至少 56px 的黑板綠呼吸空間，徹底杜絕文字切半或感覺下方被吃掉的問題。</li>
+                  <li><strong>📏 座號換行懸掛縮排：</strong> 單項作業欠交人數過多折至左側第二行時，自動設置等高 Spacer，第二行第一個座號精準從冒號左側接續、水平對齊冒號後第一個數字！</li>
+                  <li><strong>。 全體座號句號作結：</strong> 每項作業座號最後一個號碼後方必定以全形中文句號「。」作結，排版規範工整規範。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.4 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.4 (標點置中實驗版本)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🎯 冒號（：）與頓號（、）100% 絕對置中：</strong> 克服不同作業系統字型標點度量偏左偏右的問題，採用精確中心幾何定位元件，保證冒號兩點與頓號斜筆永遠精準對齊直行正中心線。</li>
+                  <li><strong>📏 連字號（-）中軸垂直對齊：</strong> 標題如「L3 - 1」之連字號亦全面套用中心幾何校準，中軸直線筆直無偏差。</li>
+                  <li><strong>🖋️ 黑板字型自由切換：</strong> 工具列提供「黑體」與「楷體」隨心切換，滿足不同大螢幕投影之觀看偏好。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.3 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.3 (字體升級與標點置中：冒號與頓號完全置中 ＆ 導入教育部標準字型切換 ＆ 移除顯示名字功能)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🎯 冒號（：）與頓號（、）完全置中：</strong> 採用台灣教育部標準排版規範之 Noto Sans TC 與正統標楷體，搭配專屬直式標點置中樣式，冒號與頓號精準置中於直行軸線上。</li>
+                  <li><strong>🖋️ 黑板字型一鍵切換（黑體 / 楷體）：</strong> 工具列支援切換「黑體（現代粉筆）」與「楷體（傳統課堂正楷）」，方便老師依投影設備與偏好自由選擇。</li>
+                  <li><strong>✨ 移除顯示名字功能：</strong> 介面精簡回歸純座號模式，移除姓名顯示開關，視覺更乾淨俐落。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.2 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.2 (黑板版面精準校準：解決作業名稱串連堆疊，1:1 還原每項作業獨立直行與自動跳列折行)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🎯 徹底解決作業名稱串連堆疊問題：</strong> 修正先前作業標題被擠在最右側同一欄的問題，現每項作業皆為完全獨立垂直欄位，由右往左依序書寫，第一項作業永遠位於黑板最右側。</li>
+                  <li><strong>↩️ 自動跳下一行（智慧直行折列）精準生效：</strong> 單一作業欠交座號過多時，CSS 垂直流自動向左側「折至下一行」繼續接續書寫座號；結束後下一項作業再開啟獨立直行。</li>
+                  <li><strong>🔤 英數代碼與座號縱中橫排（Tate-chū-yoko）完全修復：</strong> <code>L3</code>、<code>14</code>、<code>16</code>、<code>25</code> 等英數代號水平橫排於單一漢字寬度方框中，與漢字及標點正立流暢銜接，100% 符合真實黑板照片。</li>
+                  <li><strong>🖼️ 真實黑板底圖無縫嵌入：</strong> 直接從您提供的範本照片中精確提取無文字之純淨黑板綠粉筆紋理，呈現最自然的課堂黑板氛圍。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.1 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.1 (黑板排版重構：依現場實圖打造連續直式書寫、英文數字自動縱中橫排、超長自動跳列折行)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>📷 1:1 還原真實黑板畫面：</strong> 依照教室現場實體黑板版面重構，深色黑板背景配純粉筆字，呈現「<code>作業名稱：座號、座號...</code>」連續直式句子。</li>
+                  <li><strong>🔤 英文與數字自動旋轉為橫排：</strong> 英文、章節編號（如 <code>L3-1</code>）與數字座號（如 <code>14</code>、<code>16</code>、<code>25</code>）自動水平橫排（縱中橫排），漢字與標點正立。</li>
+                </ul>
+              </div>
+
+              {/* v1.8.0 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.8.0 (重大功能：黑板缺交登記榜 ＆ 中文直式排版 ＆ 遠距超大字體 ＆ 大螢幕全螢幕投影)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-19</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🏫 仿真黑板缺交登記榜：</strong> 沉浸式墨綠黑板質感、原木飾邊與粉筆槽，直覺呈現全班全部作業之缺交內容與座號清單。</li>
+                  <li><strong>📜 正統中文直式書寫排版：</strong> 依照台灣黑板聯絡簿格式，直行由右至左、由上而下排列，亦可切換直式由左至右或橫式。</li>
+                  <li><strong>🔍 遠距超大字體（後排清晰可見）：</strong> 提供標準 (24px)、大字 (32px)、特大 (42px) 與超大遠距 (56px~72px) 四段自由縮放，黃色粉筆高對比座號一目了然。</li>
+                  <li><strong>⛶ 大螢幕全螢幕投影 ＆ 點擊銷案：</strong> 一鍵進入投影模式，在觸控大螢幕點選座號即可直接標記為已交，並即時同步至雲端。</li>
+                </ul>
+              </div>
+
+              {/* v1.7.3 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.7.3 (教學現場優化：座位表視角與講台位置連動對調 ＆ 自由切換講台上下方方位)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-18</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🏫 講台位置與視角智慧連動對調：</strong> 切換「從講台往下看」時，講台自動對調至畫面下方（代表老師站在講台前，眼前為第一排學生俯瞰全班）；切換「從學生方向看」時，講台自動對調至畫面上方（學生面對前方黑板）。</li>
+                  <li><strong>↕️ 講台位置自由對調切換鈕：</strong> 工具列提供「講台在下方 / 講台在上方」一鍵對調按鈕，完全符合老師不同上課站位習慣或黑板掛設環境。</li>
+                  <li><strong>🏷️ 排數標籤與方位智慧綁定：</strong> 最靠近講台之列動態標註「第 1 列 (最前排·靠近講台)」，靠門之列標註「最後排·靠後門」，排數清晰不混淆。</li>
+                  <li><strong>🔒 換座位全功能教師防呆守門：</strong> 調整座位模式深度納入教師密碼保護，嚴防大螢幕課堂誤觸；對調演算法支援任意視角與方位。</li>
+                </ul>
+              </div>
+
+              {/* v1.7.2 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.7.2 (關鍵修復：初次換位座號變空位問題 ＆ 換座位功能納入教師權限管理)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-18</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🎯 換位防消失修復：</strong> 徹底解決首次點換位置時兩位學生變成空位的索引覆蓋問題，確保點選任意兩人課桌皆能 100% 準確對調。</li>
+                  <li><strong>🔒 密碼防呆保護：</strong> 換座位功能納入教師權限管理，非解鎖狀態顯示為「🔒 調整座位 (需教師權限)」，點擊提示輸入密碼。</li>
+                </ul>
+              </div>
+
+              {/* v1.7.0 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.7.0 (重大功能：教室座位表顯示模式 ＆ 雙向視角切換 ＆ 大字體寬格優化)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-18</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>🪑 教室座位表模式：</strong> 依照教室格局排列學生座位，支援 4~7 縱行與直排/橫排切換。</li>
+                  <li><strong>👀 雙向視角切換：</strong> 支援「從講台往下看」與「從學生方向看」兩種視角。</li>
+                  <li><strong>🔤 大字體寬格優化：</strong> 座號放大至 text-3xl~4xl 超粗體，站距 5 公尺遠依然極度清晰。</li>
+                </ul>
+              </div>
+
+              {/* v1.6.0 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.6.0 (重大功能：作業同步即時固化 ＆ 教師管理密碼防呆分權體系)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-18</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+                  <li><strong>☁️ 加入連線作業即時固化：</strong> 解決連線模式下新增作業按 F5 消失之問題，新增作業即刻寫入雲端房間。</li>
+                  <li><strong>🔐 教師密碼分權防護：</strong> 大螢幕/小老師版僅開放批改與新增作業，防止誤刪資料或誤改設定；教師輸入密碼（預設 8888）即可解鎖全功能。</li>
+                </ul>
+              </div>
+
+              {/* v1.2.1 */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-sm">
+                    v1.2.1 (關鍵修復：座號刪除直覺化、徹底移除阻塞式彈窗、班級人數一鍵裁切)
+                  </span>
+                  <span className="text-[10px] text-slate-400">2026-10-13</span>
                 </div>
                 <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
                   <li><strong>🚫 徹底移除原生阻塞彈窗：</strong> 移除所有 <code>window.confirm</code> 與 <code>alert</code>，解決在 iFrame/手機瀏覽器中點擊刪除無反應之核心痛點。</li>

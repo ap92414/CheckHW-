@@ -29,6 +29,7 @@ interface HeaderProps {
   roomCode?: string;
   isTeacherUnlocked: boolean;
   onOpenPasswordModal: () => void;
+  onOpenBlackboard?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   roomCode = '',
   isTeacherUnlocked,
   onOpenPasswordModal,
+  onOpenBlackboard,
 }) => {
   const activeClass = classes.find((c) => c.id === activeClassId);
 
@@ -99,6 +101,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Tools */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Blackboard View Button (黑板缺交榜 - 支援大螢幕投影/直式大字) */}
+          {onOpenBlackboard && (
+            <button
+              onClick={onOpenBlackboard}
+              title="開啟黑板缺交登記榜（大螢幕投影 / 全班作業直式列表 / 超大字體）"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-[#142e20] hover:bg-[#1a3d2b] text-emerald-300 border border-emerald-600/50 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <span className="text-sm">🏫</span>
+              <span className="hidden xs:inline">黑板缺交榜</span>
+            </button>
+          )}
+
           {/* Undo Button (Available in both modes for easy misclick recovery) */}
           <button
             onClick={onUndo}

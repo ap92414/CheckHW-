@@ -29,6 +29,7 @@ import { FirebaseModal } from './components/FirebaseModal';
 import { DevLogModal } from './components/DevLogModal';
 import { TeacherPasswordModal } from './components/TeacherPasswordModal';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { BlackboardModal } from './components/BlackboardModal';
 import { 
   auth, 
   ensureTeacherAuth, 
@@ -71,6 +72,7 @@ export default function App() {
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isFirebaseOpen, setIsFirebaseOpen] = useState(false);
   const [isDevLogOpen, setIsDevLogOpen] = useState(false);
+  const [isBlackboardOpen, setIsBlackboardOpen] = useState(false);
   const [isCloudSyncActive, setIsCloudSyncActive] = useState<boolean>(() => {
     return localStorage.getItem('checkhw_cloud_sync_enabled') === 'true';
   });
@@ -792,6 +794,7 @@ export default function App() {
         roomCode={roomCode}
         isTeacherUnlocked={isTeacherUnlocked}
         onOpenPasswordModal={() => setIsPasswordModalOpen(true)}
+        onOpenBlackboard={() => setIsBlackboardOpen(true)}
       />
 
       {/* 2. Assignment Management Bar */}
@@ -847,15 +850,21 @@ export default function App() {
             students={classStudents}
             statuses={appData.statuses}
             assignmentId={activeAssignment.id}
+            classId={activeClass.id}
             onToggleStudentStatus={handleToggleStudentStatus}
             onSetStudentStatus={handleSetStudentStatus}
             onResetStudentStatus={handleResetStudentStatus}
             onDeleteStudent={handleDeleteStudent}
             onOpenClassManage={() => setIsClassManageOpen(true)}
+            onUpdateStudents={handleUpdateStudents}
+            isTeacherUnlocked={isTeacherUnlocked}
+            onOpenPasswordModal={() => setIsPasswordModalOpen(true)}
+            onOpenBlackboard={() => setIsBlackboardOpen(true)}
             statsBar={
               <StatsBar
                 stats={currentStats}
                 onOpenSummary={() => setIsSummaryOpen(true)}
+                onOpenBlackboard={() => setIsBlackboardOpen(true)}
               />
             }
           />
@@ -976,6 +985,16 @@ export default function App() {
         onUnlockSuccess={() => setIsTeacherUnlockedState(true)}
         onLockSuccess={() => setIsTeacherUnlockedState(false)}
         appData={appData}
+      />
+
+      <BlackboardModal
+        isOpen={isBlackboardOpen}
+        onClose={() => setIsBlackboardOpen(false)}
+        activeClass={activeClass}
+        students={appData.students}
+        assignments={appData.assignments}
+        statuses={appData.statuses}
+        onSetStudentStatus={handleSetStudentStatus}
       />
     </div>
   );

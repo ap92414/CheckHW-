@@ -6,6 +6,7 @@ export interface StudentRecord {
   seatNumber: number;
   name: string;
   isActive: boolean; // false if 缺號/轉出
+  deskIndex?: number; // 0-based custom classroom desk index
 }
 
 export interface ClassRecord {
@@ -13,6 +14,8 @@ export interface ClassRecord {
   name: string;
   studentCount: number;
   createdAt: number;
+  seatingColumns?: number;
+  seatingFillOrder?: 'col' | 'row';
 }
 
 export interface AssignmentRecord {

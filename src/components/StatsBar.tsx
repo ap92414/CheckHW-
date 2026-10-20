@@ -5,9 +5,10 @@ import { SummaryStats } from '../utils/formatSummary';
 interface StatsBarProps {
   stats: SummaryStats;
   onOpenSummary: () => void;
+  onOpenBlackboard?: () => void;
 }
 
-export const StatsBar: React.FC<StatsBarProps> = ({ stats, onOpenSummary }) => {
+export const StatsBar: React.FC<StatsBarProps> = ({ stats, onOpenSummary, onOpenBlackboard }) => {
   const { total, completed, pending, needFix, completedPercent } = stats;
 
   const completedWidth = total > 0 ? (completed / total) * 100 : 0;
@@ -63,14 +64,27 @@ export const StatsBar: React.FC<StatsBarProps> = ({ stats, onOpenSummary }) => {
             </div>
           </div>
 
-          {/* Action button: LINE Summary */}
-          <button
-            onClick={onOpenSummary}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs shrink-0 w-full sm:w-auto"
-          >
-            <Copy className="w-4 h-4" />
-            <span>產生 LINE 摘要</span>
-          </button>
+          {/* Action buttons: LINE Summary & Blackboard View */}
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 flex-wrap">
+            {onOpenBlackboard && (
+              <button
+                onClick={onOpenBlackboard}
+                title="開啟黑板缺交登記榜（全班作業直式列表 / 大螢幕投影）"
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-[#142e20] text-emerald-300 hover:bg-[#1b3d2b] border border-emerald-600/50 active:scale-95 transition-all shadow-xs shrink-0 flex-1 sm:flex-initial cursor-pointer"
+              >
+                <span className="text-base">🏫</span>
+                <span>黑板缺交榜</span>
+              </button>
+            )}
+
+            <button
+              onClick={onOpenSummary}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs shrink-0 flex-1 sm:flex-initial cursor-pointer"
+            >
+              <Copy className="w-4 h-4" />
+              <span>產生 LINE 摘要</span>
+            </button>
+          </div>
         </div>
 
         {/* Bottom: Visual Segmented Progress Bar */}
